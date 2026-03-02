@@ -69,7 +69,7 @@ class ProductInfo:
 @dataclass
 class StaticAssumptions:
     """Global static assumptions (from Static Assumptions SharePoint List)."""
-    uid_cam: float = 0.10
+    uid_cam: float = 0.20
     royalties_cam: float = 0.20
     royalties_bulb_rate: float = 0.05   # 5% of Net Revenue
     monthly_cloud_cost_cam: float = 0.0
@@ -275,17 +275,17 @@ def calculate_channel_cpam(
         channel_assumptions.expected_product_life * cloud_monthly
     )
 
-    # UID: 0.10 for Cameras, 0 otherwise
+    # UID: 0.20 for Cameras, 0 otherwise
     result.uid = static.uid_cam if is_camera else 0.0
 
     # Excess, Obsolete & Shrinkage = Landed Cost * EOS%
     result.eos = result.landed_cost * static.eos_rate
 
-    # Royalties: Bulbs = rate * Net Revenue, Cameras = fixed, else 0
-    if is_bulb:
-        result.royalties = static.royalties_bulb_rate * result.net_revenue
-    elif is_camera:
+    # Royalties: Cameras (product_group) = fixed $0.20, Bulbs (product_line) = 5% Net Rev, else 0
+    if is_camera:
         result.royalties = static.royalties_cam
+    elif is_bulb:
+        result.royalties = static.royalties_bulb_rate * result.net_revenue
     else:
         result.royalties = 0.0
 

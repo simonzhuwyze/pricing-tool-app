@@ -80,7 +80,7 @@ st.markdown(r"""
 | 7 | **Shipping Cost** | $\text{Outbound Shipping} + \text{Warehouse Storage}$ | Total logistics cost |
 | 8 | **Cloud Cost (Lifetime)** | $\text{Expected Product Life} \times \text{Monthly Cloud Cost}$ | Camera vs Non-Camera rate |
 | 9 | **EOS (Excess, Obsolete & Shrinkage)** | $\text{Landed Cost} \times \text{EOS Rate}$ | Global rate from Static Assumptions |
-| 10 | **UID** | $0.10 for Cameras, $0 otherwise | Fixed per unit |
+| 10 | **UID** | $0.20 for Cameras, $0 otherwise | Fixed per unit |
 | 11 | **Royalties** | See below | Product-type dependent |
 | 12 | **Other Cost** | $\text{Cloud Cost} + \text{EOS} + \text{UID} + \text{Royalties}$ | Combined other costs |
 | 13 | **Cost of Goods** | $\text{Landed Cost} + \text{Shipping Cost} + \text{Other Cost}$ | Total COGS per unit |
@@ -88,11 +88,13 @@ st.markdown(r"""
 
 st.subheader("Royalties Calculation")
 st.markdown(r"""
-| Product Type | Formula |
-|-------------|---------|
-| **Bulbs** | $\text{Royalty Rate (5\%)} \times \text{Net Revenue}$ |
-| **Cameras** | Fixed \$0.20 per unit |
-| **All Others** | \$0.00 |
+Priority order (first match wins):
+
+| Priority | Condition | Formula |
+|----------|-----------|---------|
+| 1 | **Product Group = Cameras** | Fixed \$0.20 per unit |
+| 2 | **Product Line = Bulbs** | $\text{Royalty Rate (5\%)} \times \text{Net Revenue}$ |
+| 3 | **All Others** | \$0.00 |
 """)
 
 st.subheader("Warehouse Logic")
@@ -223,10 +225,12 @@ st.subheader("Fixed Values")
 st.markdown("""
 | Constant | Value | Applies To |
 |----------|-------|-----------|
-| UID | $0.10 / unit | Cameras only |
-| Royalties | $0.20 / unit | Cameras only |
-| Royalties | 5% of Net Revenue | Bulbs only |
+| UID | $0.20 / unit | Cameras (product_group) only |
+| Royalties | $0.20 / unit | Cameras (product_group) only |
+| Royalties | 5% of Net Revenue | Bulbs (product_line) only |
 | Amazon 3P CC surcharge | $0.99 / unit | Amazon 3P only |
+
+> **Royalties priority**: Camera check (product_group) is evaluated first. If a product is both Camera and Bulb, Camera rule wins.
 """)
 
 st.subheader("Promotion Channel Factors")

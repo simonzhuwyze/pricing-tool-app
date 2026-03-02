@@ -34,3 +34,11 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      - name: Trigger Azure App Service to pull new image
+        run: |
+          curl -s -X POST "${{ secrets.AZURE_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            --max-time 30
+          echo "Azure webhook triggered"
