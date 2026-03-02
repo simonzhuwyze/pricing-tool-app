@@ -1,0 +1,12 @@
+streamlit>=1.40
+pandas>=2.2
+plotly>=5.22
+openpyxl>=3.1
+pyodbc>=5.0
+sqlalchemy>=2.0
+snowflake-connector-python>=3.0
+requests>=2.31
+authlib>=1.3
+streamlit-antd-components>=0.3.2
+streamlit-extras>=0.7.8
+streamlit-aggrid>=1.2.1

@@ -1,0 +1,7 @@
+﻿"Item","Unit","Value","Cost Type"
+"Excess, Obsolete & Shrinkage","% of landed cost","0.018","Other Cost"
+"UID","per unit","0.2","Other Cost"
+"Monthly Cloud Cost (Cam)","per unit","0.06","Other Cost"
+"Monthly Cloud Cost (NonCam)","per unit","0.02","Other Cost"
+"Royalties (Cam)","per unit","0.2","Other Cost"
+"Royalties (Bulb)","% of Net Rev","0.05","Other Cost"

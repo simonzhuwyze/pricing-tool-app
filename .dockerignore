@@ -1,0 +1,12 @@
+.env
+.git
+.gitignore
+__pycache__
+*.pyc
+.streamlit/secrets.toml
+pages/_old_backup/
+*.egg-info
+.pytest_cache
+.mypy_cache
+.venv
+venv

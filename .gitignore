@@ -1,0 +1,36 @@
+# Environment & secrets
+.env
+*.env
+secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Old backups
+pages/_old_backup/
+
+# Claude Code
+.claude/
+
+# Misc temp files
+_ul
