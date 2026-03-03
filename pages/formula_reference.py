@@ -84,7 +84,7 @@ st.markdown("""
 | 7 | **Shipping Cost** | `= Outbound Shipping + Warehouse Storage` | Total logistics cost |
 | 8 | **Cloud Cost (Lifetime)** | `= Expected Product Life × Monthly Cloud Cost` | Camera vs Non-Camera rate |
 | 9 | **EOS (Excess, Obsolete & Shrinkage)** | `= Landed Cost × EOS Rate` | Global rate from Static Assumptions |
-| 10 | **UID** | `= $0.20` for Cameras, `$0` otherwise | Fixed per unit |
+| 10 | **UID** | 0.20 for Cameras, 0 otherwise | Fixed per unit |
 | 11 | **Royalties** | See below | Product-type dependent |
 | 12 | **Other Cost** | `= Cloud Cost + EOS + UID + Royalties` | Combined other costs |
 | 13 | **Cost of Goods** | `= Landed Cost + Shipping Cost + Other Cost` | Total COGS per unit |
@@ -96,9 +96,9 @@ Priority order (first match wins):
 
 | Priority | Condition | Formula |
 |----------|-----------|---------|
-| 1 | **Product Group = Cameras** | Fixed $0.20 per unit |
+| 1 | **Product Group = Cameras** | Fixed 0.20 per unit |
 | 2 | **Product Line = Bulbs** | `= 5% × Net Revenue` |
-| 3 | **All Others** | $0.00 |
+| 3 | **All Others** | 0.00 |
 """)
 
 st.subheader("Warehouse Logic")
@@ -118,12 +118,12 @@ st.markdown("""
 | # | Metric | Formula | Notes |
 |---|--------|---------|-------|
 | 1 | **Customer Service** | `= Customer Service Rate × Post-Promo Retailer Price` | Channel-level rate |
-| 2 | **CC & Platform Fees** | `= CC Fee Rate × Price Paid by End-User` | +$0.99 for Amazon 3P |
+| 2 | **CC & Platform Fees** | `= CC Fee Rate × Price Paid by End-User` | +0.99 for Amazon 3P |
 | 3 | **Marketing** | `= Marketing Rate × MSRP` | Channel-level rate |
 | 4 | **S&M Expenses Total** | `= Customer Service + CC Fees + Marketing` | Total S&M per unit |
 """)
 
-st.info("💡 **Amazon 3P special rule**: CC & Platform Fees adds a fixed $0.99/unit on top of the rate-based calculation.")
+st.info("💡 **Amazon 3P special rule**: CC & Platform Fees adds a fixed 0.99/unit on top of the rate-based calculation.")
 
 # ===== PROFIT METRICS =====
 st.divider()
@@ -212,9 +212,9 @@ st.markdown("""
 | Marketing Rate | Per-Channel | `Static_S&M Expenses.csv` / `admin_sm_expenses` |
 | EOS Rate | Global | `Static_Cost Assumptions.csv` / `admin_static_assumptions` |
 | Monthly Cloud Cost | Global (Cam / Non-Cam) | `Static_Cost Assumptions.csv` / `admin_static_assumptions` |
-| UID | Global (Camera only) | Fixed $0.20 |
+| UID | Global (Camera only) | Fixed 0.20 |
 | Royalty Rate (Bulbs) | Global | Fixed 5% of Net Revenue |
-| Royalty (Cameras) | Global | Fixed $0.20/unit |
+| Royalty (Cameras) | Global | Fixed 0.20/unit |
 """)
 
 # ===== CONSTANTS =====
@@ -232,10 +232,10 @@ st.subheader("Fixed Values")
 st.markdown("""
 | Constant | Value | Applies To |
 |----------|-------|-----------|
-| UID | $0.20 / unit | Cameras (product_group) only |
-| Royalties | $0.20 / unit | Cameras (product_group) only |
+| UID | 0.20 / unit | Cameras (product_group) only |
+| Royalties | 0.20 / unit | Cameras (product_group) only |
 | Royalties | 5% of Net Revenue | Bulbs (product_line) only |
-| Amazon 3P CC surcharge | $0.99 / unit | Amazon 3P only |
+| Amazon 3P CC surcharge | 0.99 / unit | Amazon 3P only |
 
 > **Royalties priority**: Camera check (product_group) is evaluated first. If a product is both Camera and Bulb, Camera rule wins.
 """)
