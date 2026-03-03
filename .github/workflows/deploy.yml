@@ -36,8 +36,10 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ github.sha }}
 
       - name: Trigger Azure App Service to pull new image
+        env:
+          WEBHOOK_URL: ${{ secrets.AZURE_WEBHOOK_URL }}
         run: |
-          curl -s -X POST "${{ secrets.AZURE_WEBHOOK_URL }}" \
+          curl -s -X POST "${WEBHOOK_URL}" \
             -H "Content-Type: application/json" \
             -d '{}' \
             --max-time 30
