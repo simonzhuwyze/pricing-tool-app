@@ -636,7 +636,7 @@ def sync_csv_to_cache():
       9. Static Cost Assumptions → cache_static_assumptions
     """
     from core.data_loader import (
-        load_product_directory, load_sku_mapping,
+        load_product_directory,
         load_po_discount, load_outbound_shipping,
         load_return_rate_by_sku, load_cost_assumptions,
         load_channel_terms, load_sm_expenses,
@@ -663,18 +663,8 @@ def sync_csv_to_cache():
                                if c in products_db.columns]]
     products_db.to_sql("cache_product_directory", engine, if_exists="replace", index=False)
 
-    # 2. SKU Mapping
-    sku_map = load_sku_mapping()
-    sku_map_db = sku_map.rename(columns={
-        "SKU": "sku",
-        "Product_Group": "product_group",
-        "Product_Category": "product_category",
-        "Product_Line": "product_line",
-    })
-    sku_map_db["synced_at"] = now
-    sku_map_db = sku_map_db[[c for c in ["sku", "product_group", "product_category", "product_line", "synced_at"]
-                             if c in sku_map_db.columns]]
-    sku_map_db.to_sql("cache_sku_mapping", engine, if_exists="replace", index=False)
+    # 2. SKU Mapping — SKIPPED: comes from Snowflake sync only (snowflake_sync.sync_sku_mapping)
+    #    CSV fallback (SF_SKU Mapping.csv) is used at read-time by data_loader.load_sku_mapping()
 
     # 3. PO Discount / Retail Margin
     po = load_po_discount()
@@ -836,7 +826,7 @@ def sync_csv_to_cache():
     cursor = conn.cursor()
     tables = [
         ("cache_product_directory", len(products)),
-        ("cache_sku_mapping", len(sku_map)),
+        # cache_sku_mapping excluded — populated by Snowflake sync only
         ("cache_po_discount", len(po_db) if not po.empty else 0),
         ("cache_return_rate_sku", len(rr_db) if not rr.empty else 0),
         ("cache_outbound_shipping", len(ob_db) if not ob.empty else 0),
