@@ -83,6 +83,11 @@ pt_assumptions = st.Page(
     title="Assumptions Loaded",
     icon="📋",
 )
+pt_export = st.Page(
+    "pages/pricing_tool_export.py",
+    title="Export Report",
+    icon="📄",
+)
 
 # Reference
 templates = st.Page(
@@ -148,7 +153,7 @@ sf_raw_viewer = st.Page(
 # --- Navigation ---
 pg = st.navigation({
     "Product Directory": [product_directory],
-    "Pricing Tool": [pt_main, pt_cpam, pt_channel_mix, pt_sensitivity, pt_assumptions],
+    "Pricing Tool": [pt_main, pt_cpam, pt_channel_mix, pt_sensitivity, pt_assumptions, pt_export],
     "Reference": [templates, formula_ref, user_guide],
     "Assumptions": [a_retail_margin, a_return_rate, a_outbound, a_product_costs, a_finance],
     "Settings": [db_admin, data_validation, sf_raw_viewer],
