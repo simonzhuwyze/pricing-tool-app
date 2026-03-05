@@ -95,6 +95,11 @@ formula_ref = st.Page(
     title="Formula Reference",
     icon="📐",
 )
+user_guide = st.Page(
+    "pages/user_guide.py",
+    title="User Guide",
+    icon="📖",
+)
 
 # Assumptions
 a_retail_margin = st.Page(
@@ -144,7 +149,7 @@ sf_raw_viewer = st.Page(
 pg = st.navigation({
     "Product Directory": [product_directory],
     "Pricing Tool": [pt_main, pt_cpam, pt_channel_mix, pt_sensitivity, pt_assumptions],
-    "Reference": [templates, formula_ref],
+    "Reference": [templates, formula_ref, user_guide],
     "Assumptions": [a_retail_margin, a_return_rate, a_outbound, a_product_costs, a_finance],
     "Settings": [db_admin, data_validation, sf_raw_viewer],
 })
