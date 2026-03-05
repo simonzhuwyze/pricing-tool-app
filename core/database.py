@@ -747,6 +747,59 @@ def sync_csv_to_cache():
                                if c in static_db.columns]]
         static_db.to_sql("cache_static_assumptions", engine, if_exists="replace", index=False)
 
+    # Also sync finance-related CSVs to admin tables (for Finance Assumptions page)
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Admin Channel Terms
+    if not ct.empty:
+        cursor.execute("DELETE FROM admin_channel_terms")
+        for _, row in ct_db.iterrows():
+            ch = row.get("channel", "")
+            if not ch:
+                continue
+            cursor.execute("""
+                INSERT INTO admin_channel_terms
+                (channel, chargeback, early_pay_discount, co_op, freight_allowance,
+                 labor, damage_allowance, end_cap, discount_special, trade_discount, total_discount, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                ch,
+                float(row.get("chargeback", 0) or 0),
+                float(row.get("early_pay_discount", 0) or 0),
+                float(row.get("co_op", 0) or 0),
+                float(row.get("freight_allowance", 0) or 0),
+                float(row.get("labor", 0) or 0),
+                float(row.get("damage_allowance", 0) or 0),
+                float(row.get("end_cap", 0) or 0),
+                float(row.get("discount_special", 0) or 0),
+                float(row.get("trade_discount", 0) or 0),
+                float(row.get("total_discount", 0) or 0),
+                "csv_sync",
+            ))
+
+    # Admin S&M Expenses
+    if not sm.empty:
+        cursor.execute("DELETE FROM admin_sm_expenses")
+        for _, row in sm_db.iterrows():
+            ch = row.get("channel", "")
+            if not ch:
+                continue
+            cursor.execute("""
+                INSERT INTO admin_sm_expenses
+                (channel_name, credit_card_platform_fee, customer_service, marketing, updated_by)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                ch,
+                float(row.get("cc_platform_fee", 0) or 0),
+                float(row.get("customer_service", 0) or 0),
+                float(row.get("marketing", 0) or 0),
+                "csv_sync",
+            ))
+
+    conn.commit()
+    conn.close()
+
     # Update sync metadata
     conn = get_connection()
     cursor = conn.cursor()
