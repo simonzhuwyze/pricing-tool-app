@@ -3,14 +3,13 @@ Assumption Resolver
 Resolves the correct assumption value for a given SKU/channel/field,
 applying the priority chain and Reference SKU fallback.
 
-Priority chain:
-  1. user_overrides table (Azure SQL)
-  2. cache_* tables (Azure SQL, loaded from CSV or Snowflake)
-  3. CSV file fallback (local files in data/reference data/)
+Data source: Azure SQL only (populated by CSV Sync or Snowflake Sync).
+No runtime CSV fallback — all data must be in the database.
 
-Reference SKU Fallback:
-  If SKU has no data for a given assumption, look up the product's
-  Reference SKU from product directory and use its values instead.
+Priority chain:
+  1. cache_* tables (Azure SQL)
+  2. Reference SKU fallback (same tables, different SKU)
+  3. default(0)
 """
 
 from dataclasses import dataclass, field
@@ -23,19 +22,7 @@ from core.cpam_engine import (
     ProductInfo,
     StaticAssumptions,
 )
-from core.data_loader import (
-    CHANNELS,
-    load_product_directory,
-    load_sku_mapping,
-    load_retail_margin,
-    load_return_rate_by_sku,
-    load_outbound_shipping,
-    load_cost_assumptions,
-    load_channel_terms,
-    load_sm_expenses,
-    load_static_cost_assumptions,
-    parse_static_assumptions,
-)
+from core.data_loader import CHANNELS
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +33,7 @@ class ResolutionEntry:
     channel: str
     field_name: str
     value: float
-    source: str  # 'cache', 'csv', 'ref_sku', 'default'
+    source: str  # 'cache', 'ref_sku', 'default'
 
 
 @dataclass
@@ -61,56 +48,22 @@ class ResolvedAssumptions:
 
 
 # ---------------------------------------------------------------------------
-# Internal caches (Streamlit-safe when available, fallback to dict)
+# Cache management (Streamlit-safe)
 # ---------------------------------------------------------------------------
-try:
-    import streamlit as st
-
-    @st.cache_data(ttl=300)
-    def _cached_load(key: str):
-        """Load and cache CSV data by key. TTL=5min, Streamlit-managed."""
-        _loaders = {
-            "product_directory": load_product_directory,
-            "sku_mapping": load_sku_mapping,
-            "retail_margin": load_retail_margin,
-            "return_rate": load_return_rate_by_sku,
-            "outbound_shipping": load_outbound_shipping,
-            "cost_assumptions": load_cost_assumptions,
-            "channel_terms": load_channel_terms,
-            "sm_expenses": load_sm_expenses,
-            "static_cost_assumptions": load_static_cost_assumptions,
-        }
-        loader = _loaders.get(key)
-        if loader:
-            return loader()
-        return pd.DataFrame()
-
-    def _get_cached(key: str, loader):
-        """Cache CSV data via Streamlit cache."""
-        return _cached_load(key)
-
-    def clear_cache():
-        """Clear the Streamlit data cache."""
-        _cached_load.clear()
-
-except ImportError:
-    # Non-Streamlit fallback (CLI scripts, tests)
-    _cache: dict = {}
-
-    def _get_cached(key: str, loader):
-        if key not in _cache:
-            _cache[key] = loader()
-        return _cache[key]
-
-    def clear_cache():
-        _cache.clear()
+def clear_cache():
+    """Clear Streamlit data caches (call after CSV sync or data change)."""
+    try:
+        import streamlit as st
+        st.cache_data.clear()
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
-# DB helpers (try Azure SQL first, fall back to CSV)
+# DB helpers
 # ---------------------------------------------------------------------------
 def _try_load_from_db(table_name: str, engine) -> Optional[pd.DataFrame]:
-    """Try to load a table from Azure SQL. Returns None if unavailable."""
+    """Load a table from Azure SQL. Returns None if unavailable."""
     if engine is None:
         return None
     try:
@@ -123,7 +76,7 @@ def _try_load_from_db(table_name: str, engine) -> Optional[pd.DataFrame]:
 
 
 def _get_db_engine():
-    """Try to get the cached SQLAlchemy engine. Returns None if unavailable."""
+    """Get the cached SQLAlchemy engine. Returns None if unavailable."""
     try:
         from core.database import get_sqlalchemy_engine
         return get_sqlalchemy_engine()
@@ -132,33 +85,50 @@ def _get_db_engine():
 
 
 # ---------------------------------------------------------------------------
-# Product Info resolution
+# Product Info resolution (DB only)
 # ---------------------------------------------------------------------------
 def resolve_product_info(sku: str) -> ProductInfo:
     """
-    Resolve ProductInfo including SKU mapping enrichment.
-    If SKU not in sku_mapping, use reference_sku's mapping.
+    Resolve ProductInfo from Azure SQL tables.
+    Product directory: cache_product_directory
+    SKU mapping: cache_sku_mapping
     """
-    pd_df = _get_cached("product_directory", load_product_directory)
-    prod_row = pd_df[pd_df["SKU"] == sku]
+    engine = _get_db_engine()
+
+    # Load product directory from DB
+    pd_df = _try_load_from_db("cache_product_directory", engine)
 
     product_name = ""
     reference_sku = ""
-    if not prod_row.empty:
-        product_name = str(prod_row.iloc[0].get("Product Name", ""))
-        ref_raw = prod_row.iloc[0].get("Reference SKU", "")
-        reference_sku = str(ref_raw) if pd.notna(ref_raw) and ref_raw else ""
+    if pd_df is not None and not pd_df.empty:
+        # Normalize column names
+        col_map = {}
+        for c in pd_df.columns:
+            cl = c.lower()
+            if cl == "sku":
+                col_map[c] = "SKU"
+            elif cl == "product_name":
+                col_map[c] = "Product Name"
+            elif cl == "reference_sku":
+                col_map[c] = "Reference SKU"
+        pd_df = pd_df.rename(columns=col_map)
 
-    # Try sku mapping from DB first; fallback to CSV if DB lacks product_category
-    engine = _get_db_engine()
+        if "SKU" in pd_df.columns:
+            prod_row = pd_df[pd_df["SKU"] == sku]
+            if not prod_row.empty:
+                product_name = str(prod_row.iloc[0].get("Product Name", ""))
+                ref_raw = prod_row.iloc[0].get("Reference SKU", "")
+                reference_sku = str(ref_raw) if pd.notna(ref_raw) and ref_raw else ""
+
+    # Load SKU mapping from DB
     sku_map_df = _try_load_from_db("cache_sku_mapping", engine)
-    if sku_map_df is not None:
-        # Check if DB has product_category column
-        cols_lower = [c.lower() for c in sku_map_df.columns]
-        if "product_category" not in cols_lower:
-            sku_map_df = None  # DB is stale, fallback to CSV
-    if sku_map_df is None:
-        sku_map_df = _get_cached("sku_mapping", load_sku_mapping)
+
+    if sku_map_df is None or sku_map_df.empty:
+        return ProductInfo(
+            sku=sku, product_name=product_name,
+            product_group="", product_category="", product_line="",
+            reference_sku=reference_sku,
+        )
 
     # Normalize column names
     col_renames = {}
@@ -175,6 +145,8 @@ def resolve_product_info(sku: str) -> ProductInfo:
     sku_map_df = sku_map_df.rename(columns=col_renames)
 
     def _lookup_mapping(lookup_sku: str) -> Tuple[str, str, str]:
+        if "SKU" not in sku_map_df.columns:
+            return ("", "", "")
         match = sku_map_df[sku_map_df["SKU"].str.upper() == lookup_sku.upper()]
         if not match.empty:
             row = match.iloc[0]
@@ -202,12 +174,12 @@ def resolve_product_info(sku: str) -> ProductInfo:
 
 
 # ---------------------------------------------------------------------------
-# Static Assumptions resolution
+# Static Assumptions resolution (DB only)
 # ---------------------------------------------------------------------------
 def resolve_static_assumptions() -> StaticAssumptions:
     """
-    Load static assumptions.
-    Priority: admin_static_assumptions (DB) > cache > CSV
+    Load static assumptions from Azure SQL.
+    Priority: admin_static_assumptions > cache_static_assumptions
     """
     engine = _get_db_engine()
 
@@ -217,10 +189,15 @@ def resolve_static_assumptions() -> StaticAssumptions:
         parsed = _parse_admin_static(admin_df)
         return StaticAssumptions(**parsed)
 
-    # Try CSV
-    csv_df = _get_cached("static_cost_assumptions", load_static_cost_assumptions)
-    parsed = parse_static_assumptions(csv_df)
-    return StaticAssumptions(**parsed)
+    # Try cache table
+    cache_df = _try_load_from_db("cache_static_assumptions", engine)
+    if cache_df is not None and not cache_df.empty:
+        parsed = _parse_admin_static(cache_df)
+        return StaticAssumptions(**parsed)
+
+    # No data — return zeros
+    logger.warning("No static assumptions found in DB. Returning defaults.")
+    return StaticAssumptions()
 
 
 def _parse_admin_static(df: pd.DataFrame) -> dict:
@@ -386,13 +363,7 @@ def _resolve_channel_field(
 def resolve_all_assumptions(sku: str) -> ResolvedAssumptions:
     """
     Master function that resolves ALL assumptions for a given SKU.
-
-    Steps:
-    1. Resolve product info (product directory + SKU mapping)
-    2. Resolve static assumptions
-    3. Load all datasets (DB preferred, CSV fallback)
-    4. For each channel, resolve each field via priority chain
-    5. Return ResolvedAssumptions with full channel_assumptions dict
+    All data from Azure SQL — no CSV fallback.
     """
     # 1. Product info
     product_info = resolve_product_info(sku)
@@ -401,7 +372,7 @@ def resolve_all_assumptions(sku: str) -> ResolvedAssumptions:
     # 2. Static assumptions
     static = resolve_static_assumptions()
 
-    # 3. Load datasets (prefer DB, fall back to CSV)
+    # 3. Load datasets (DB only)
     engine = _get_db_engine()
     datasets = _load_all_datasets(engine)
 
@@ -451,13 +422,12 @@ def resolve_all_assumptions(sku: str) -> ResolvedAssumptions:
 
 
 def _load_all_datasets(engine) -> dict:
-    """Load all datasets needed for assumption resolution."""
+    """Load all datasets from Azure SQL. No CSV fallback."""
     datasets = {}
 
     # Retail Margin / PO Discount
     db_df = _try_load_from_db("cache_po_discount", engine)
     if db_df is not None and not db_df.empty:
-        # Normalize columns
         col_map = {}
         for c in db_df.columns:
             cl = c.lower()
@@ -467,10 +437,7 @@ def _load_all_datasets(engine) -> dict:
                 col_map[c] = "Channel"
             elif "po_discount" in cl or "retail_margin" in cl:
                 col_map[c] = "PO_Discount_Rate"
-        db_df = db_df.rename(columns=col_map)
-        datasets["retail_margin"] = db_df
-    else:
-        datasets["retail_margin"] = _get_cached("retail_margin", load_retail_margin)
+        datasets["retail_margin"] = db_df.rename(columns=col_map)
 
     # Return Rate (per-SKU)
     db_df = _try_load_from_db("cache_return_rate_sku", engine)
@@ -484,10 +451,7 @@ def _load_all_datasets(engine) -> dict:
                 col_map[c] = "Channel"
             elif "return_rate" in cl:
                 col_map[c] = "Return_Rate"
-        db_df = db_df.rename(columns=col_map)
-        datasets["return_rate"] = db_df
-    else:
-        datasets["return_rate"] = _get_cached("return_rate", load_return_rate_by_sku)
+        datasets["return_rate"] = db_df.rename(columns=col_map)
 
     # Outbound Shipping
     db_df = _try_load_from_db("cache_outbound_shipping", engine)
@@ -501,10 +465,7 @@ def _load_all_datasets(engine) -> dict:
                 col_map[c] = "Channel"
             elif "shipping" in cl or "outbound" in cl:
                 col_map[c] = "Outbound_Shipping_Cost"
-        db_df = db_df.rename(columns=col_map)
-        datasets["outbound_shipping"] = db_df
-    else:
-        datasets["outbound_shipping"] = _get_cached("outbound_shipping", load_outbound_shipping)
+        datasets["outbound_shipping"] = db_df.rename(columns=col_map)
 
     # Cost Assumptions (per-SKU)
     db_df = _try_load_from_db("cache_cost_assumptions", engine)
@@ -522,10 +483,7 @@ def _load_all_datasets(engine) -> dict:
                 col_map[c] = "Amazon_FBA"
             elif "life" in cl or "product_life" in cl:
                 col_map[c] = "Expected_Product_Life"
-        db_df = db_df.rename(columns=col_map)
-        datasets["cost_assumptions"] = db_df
-    else:
-        datasets["cost_assumptions"] = _get_cached("cost_assumptions", load_cost_assumptions)
+        datasets["cost_assumptions"] = db_df.rename(columns=col_map)
 
     # Channel Terms
     db_df = _try_load_from_db("cache_channel_terms", engine)
@@ -539,10 +497,7 @@ def _load_all_datasets(engine) -> dict:
                 col_map[c] = "Chargeback"
             elif "total" in cl and "discount" in cl:
                 col_map[c] = "Total Discount"
-        db_df = db_df.rename(columns=col_map)
-        datasets["channel_terms"] = db_df
-    else:
-        datasets["channel_terms"] = _get_cached("channel_terms", load_channel_terms)
+        datasets["channel_terms"] = db_df.rename(columns=col_map)
 
     # S&M Expenses
     db_df = _try_load_from_db("cache_sm_expenses", engine)
@@ -558,10 +513,7 @@ def _load_all_datasets(engine) -> dict:
                 col_map[c] = "Customer_Service"
             elif "marketing" in cl:
                 col_map[c] = "Marketing"
-        db_df = db_df.rename(columns=col_map)
-        datasets["sm_expenses"] = db_df
-    else:
-        datasets["sm_expenses"] = _get_cached("sm_expenses", load_sm_expenses)
+        datasets["sm_expenses"] = db_df.rename(columns=col_map)
 
     return datasets
 

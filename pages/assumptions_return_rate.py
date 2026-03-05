@@ -1,6 +1,6 @@
 """
 Return Rate - View and edit per-SKU per-channel return rates.
-Data source: CSV fallback, Azure SQL cache_return_rate_sku when connected.
+Data source: Azure SQL cache_return_rate_sku table.
 """
 
 import os
@@ -19,25 +19,34 @@ if env_path.exists():
             key, val = line.split("=", 1)
             os.environ[key.strip()] = val.strip().strip('"').strip("'")
 
-from core.data_loader import load_return_rate_by_sku, load_product_directory
 from core.ui_helpers import styled_header, styled_divider, styled_metric_cards
 from core.auth import require_permission
 
 styled_header("Return Rate", "Return rates per SKU per channel. Values are decimals (0.05 = 5% return rate).")
 require_permission("edit_assumptions", "Return Rate")
 
-# Load data
-df = load_return_rate_by_sku()
+# Load data from Azure SQL
+try:
+    from core.database import get_sqlalchemy_engine
+    engine = get_sqlalchemy_engine()
+
+    df = pd.read_sql_table("cache_return_rate_sku", engine)
+    df = df.rename(columns={c: {"sku": "SKU", "channel": "Channel", "return_rate": "Return_Rate"}.get(c.lower(), c) for c in df.columns})
+
+    dir_df = pd.read_sql_table("cache_product_directory", engine)
+    dir_df = dir_df.rename(columns={"sku": "SKU", "product_name": "Product Name", "reference_sku": "Reference SKU"})
+except Exception as e:
+    st.error(f"Database connection failed: {e}")
+    st.stop()
 
 if df.empty:
-    st.warning("No return rate data found.")
+    st.warning("No return rate data found. Run CSV Sync from DB Admin page.")
     st.stop()
 
 # Pivot for display: SKU x Channel
 pivot = df.pivot_table(index="SKU", columns="Channel", values="Return_Rate")
 
-# Load product directory for Product Name and Reference SKU
-dir_df = load_product_directory()
+# Product Name and Reference SKU
 sku_to_name = dict(zip(dir_df["SKU"], dir_df.get("Product Name", pd.Series(dtype=str))))
 sku_to_ref = dict(zip(dir_df["SKU"], dir_df.get("Reference SKU", pd.Series(dtype=str))))
 
@@ -74,6 +83,7 @@ styled_metric_cards()
 
 # DB editing section
 styled_divider(label="Edit Single Value", icon="pencil-square")
+st.caption("Update a specific SKU/Channel return rate. Saves to Azure SQL cache.")
 
 db_connected = False
 try:

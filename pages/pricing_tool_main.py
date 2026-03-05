@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.data_loader import CHANNELS, load_product_directory
+from core.data_loader import CHANNELS
 from core.cpam_engine import (
     UserInputs, calculate_channel_cpam, calculate_weighted_cpam,
 )
@@ -20,11 +20,24 @@ from core.ui_helpers import styled_header, styled_divider, styled_metric_cards, 
 
 
 # ---------------------------------------------------------------------------
-# Load product list
+# Load product list (from Azure SQL)
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=300)
 def _load_products():
-    return load_product_directory()
+    from core.database import get_sqlalchemy_engine
+    engine = get_sqlalchemy_engine()
+    df = pd.read_sql_table("cache_product_directory", engine)
+    # Normalize column names for compatibility
+    col_map = {}
+    for c in df.columns:
+        cl = c.lower()
+        if cl == "sku": col_map[c] = "SKU"
+        elif cl == "product_name": col_map[c] = "Product Name"
+        elif cl == "reference_sku": col_map[c] = "Reference SKU"
+        elif cl == "default_msrp": col_map[c] = "Default MSRP"
+        elif cl == "default_fob": col_map[c] = "Default FOB"
+        elif cl == "default_tariff_rate": col_map[c] = "Default Tariff Rate"
+    return df.rename(columns=col_map)
 
 
 products_df = _load_products()

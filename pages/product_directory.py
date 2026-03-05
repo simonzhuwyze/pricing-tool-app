@@ -14,7 +14,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.data_loader import load_product_directory, load_sku_mapping
 from core.ui_helpers import styled_header, styled_divider, styled_metric_cards, render_aggrid, styled_alert
 import streamlit_antd_components as sac
 
@@ -38,13 +37,46 @@ except Exception:
     pass
 
 # ---------------------------------------------------------------------------
-# Load & merge data
+# Load & merge data (from Azure SQL)
 # ---------------------------------------------------------------------------
-products = load_product_directory()
-sku_map = load_sku_mapping()
+def _load_products_from_db():
+    """Load product directory from Azure SQL."""
+    df = pd.read_sql_table("cache_product_directory", engine)
+    col_map = {}
+    for c in df.columns:
+        cl = c.lower()
+        if cl == "sku": col_map[c] = "SKU"
+        elif cl == "product_name": col_map[c] = "Product Name"
+        elif cl == "reference_sku": col_map[c] = "Reference SKU"
+        elif cl == "default_msrp": col_map[c] = "Default MSRP"
+        elif cl == "default_fob": col_map[c] = "Default FOB"
+        elif cl == "default_tariff_rate": col_map[c] = "Default Tariff Rate"
+    return df.rename(columns=col_map)
+
+def _load_sku_mapping_from_db():
+    """Load SKU mapping from Azure SQL."""
+    try:
+        df = pd.read_sql_table("cache_sku_mapping", engine)
+        col_map = {}
+        for c in df.columns:
+            cl = c.lower()
+            if cl in ("item", "sku"): col_map[c] = "SKU"
+            elif "product_group" in cl: col_map[c] = "Product_Group"
+            elif "product_category" in cl: col_map[c] = "Product_Category"
+            elif "product_line" in cl: col_map[c] = "Product_Line"
+        return df.rename(columns=col_map)
+    except Exception:
+        return pd.DataFrame()
+
+if not db_available:
+    st.error("Database connection required. Go to Settings > DB Admin to check connection.")
+    st.stop()
+
+products = _load_products_from_db()
+sku_map = _load_sku_mapping_from_db()
 
 if products.empty:
-    st.error("No products found. Check data/reference data/Product Directory.csv")
+    st.error("No products found in database. Run CSV Sync from DB Admin page first.")
     st.stop()
 
 if not sku_map.empty and "SKU" in sku_map.columns:

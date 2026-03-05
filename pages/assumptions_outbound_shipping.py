@@ -1,7 +1,6 @@
 """
 Outbound Shipping - View and edit per-SKU per-channel outbound shipping costs.
-Data source: CSV fallback, Azure SQL cache_outbound_shipping when connected.
-Note: This data may come from Snowflake sync rather than CSV.
+Data source: Azure SQL cache_outbound_shipping table.
 """
 
 import os
@@ -20,55 +19,44 @@ if env_path.exists():
             key, val = line.split("=", 1)
             os.environ[key.strip()] = val.strip().strip('"').strip("'")
 
-from core.data_loader import load_outbound_shipping, load_product_directory
 from core.ui_helpers import styled_header, styled_divider
 from core.auth import require_permission
 
 styled_header("Outbound Shipping", "Outbound shipping costs per SKU per channel. Values in USD per unit.")
 require_permission("edit_assumptions", "Outbound Shipping")
 
-# Try loading from DB first, then CSV
-db_connected = False
-df = pd.DataFrame()
-
+# Load data from Azure SQL
 try:
     from core.database import get_connection, get_sqlalchemy_engine
     engine = get_sqlalchemy_engine()
-    pd.read_sql("SELECT 1", engine)
-    db_connected = True
 
-    db_df = pd.read_sql("SELECT * FROM cache_outbound_shipping", engine)
-    if not db_df.empty:
-        # Normalize columns
-        col_map = {}
-        for c in db_df.columns:
-            cl = c.lower()
-            if cl == "sku":
-                col_map[c] = "SKU"
-            elif cl == "channel":
-                col_map[c] = "Channel"
-            elif "shipping" in cl or "outbound" in cl:
-                col_map[c] = "Outbound_Shipping_Cost"
-        df = db_df.rename(columns=col_map)
-        st.success("Loaded from Azure SQL cache.")
-except Exception:
-    pass
+    db_df = pd.read_sql_table("cache_outbound_shipping", engine)
+    # Normalize columns
+    col_map = {}
+    for c in db_df.columns:
+        cl = c.lower()
+        if cl == "sku":
+            col_map[c] = "SKU"
+        elif cl == "channel":
+            col_map[c] = "Channel"
+        elif "shipping" in cl or "outbound" in cl:
+            col_map[c] = "Outbound_Shipping_Cost"
+    df = db_df.rename(columns=col_map)
 
-if df.empty:
-    df = load_outbound_shipping()
-    if not df.empty:
-        st.info("Loaded from CSV. Sync via DB Admin to use cloud data.")
+    dir_df = pd.read_sql_table("cache_product_directory", engine)
+    dir_df = dir_df.rename(columns={"sku": "SKU", "product_name": "Product Name", "reference_sku": "Reference SKU"})
+except Exception as e:
+    st.error(f"Database connection failed: {e}")
+    st.stop()
 
 if df.empty:
-    st.warning("No outbound shipping data available. Sync from Snowflake via DB Admin.")
-    st.caption("Outbound shipping data typically comes from Snowflake sync, not from CSV files.")
+    st.warning("No outbound shipping data found. Run CSV Sync from DB Admin page.")
     st.stop()
 
 # Pivot for display: SKU x Channel
 pivot = df.pivot_table(index="SKU", columns="Channel", values="Outbound_Shipping_Cost")
 
-# Load product directory for Product Name and Reference SKU
-dir_df = load_product_directory()
+# Product Name and Reference SKU
 sku_to_name = dict(zip(dir_df["SKU"], dir_df.get("Product Name", pd.Series(dtype=str))))
 sku_to_ref = dict(zip(dir_df["SKU"], dir_df.get("Reference SKU", pd.Series(dtype=str))))
 
@@ -90,9 +78,19 @@ st.dataframe(formatted, use_container_width=True, hide_index=True, height=600)
 st.caption(f"{len(pivot)} SKUs x {len(data_cols)} channels")
 
 # DB editing section
-if db_connected:
-    styled_divider(label="Edit Single Value", icon="pencil-square")
+styled_divider(label="Edit Single Value", icon="pencil-square")
+st.caption("Update a specific SKU/Channel outbound shipping cost. Saves to Azure SQL cache.")
 
+db_connected = False
+try:
+    pd.read_sql("SELECT 1", engine)
+    db_connected = True
+except Exception:
+    pass
+
+if not db_connected:
+    st.info("Connect to Azure SQL via DB Admin to enable editing.")
+else:
     col1, col2, col3 = st.columns(3)
     with col1:
         edit_sku = st.selectbox("SKU", sorted(pivot["SKU"].tolist()), key="ob_edit_sku")

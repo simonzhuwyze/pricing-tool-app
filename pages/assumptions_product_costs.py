@@ -1,7 +1,7 @@
 """
 Product Cost Assumptions - View and edit per-SKU cost assumptions.
 Fields: Inbound Freight, Warehouse Storage, Amazon FBA, Expected Product Life
-Data source: CSV fallback, Azure SQL cache_cost_assumptions when connected.
+Data source: Azure SQL cache_cost_assumptions table.
 """
 
 import os
@@ -20,22 +20,40 @@ if env_path.exists():
             key, val = line.split("=", 1)
             os.environ[key.strip()] = val.strip().strip('"').strip("'")
 
-from core.data_loader import load_cost_assumptions, load_product_directory
 from core.ui_helpers import styled_header, styled_divider
 from core.auth import require_permission
 
 styled_header("Product Cost Assumptions", "Per-SKU cost parameters: inbound freight, warehouse storage, Amazon FBA fees, and expected product life.")
 require_permission("edit_assumptions", "Product Costs")
 
-# Load data
-df = load_cost_assumptions()
+# Load data from Azure SQL
+try:
+    from core.database import get_sqlalchemy_engine
+    engine = get_sqlalchemy_engine()
+
+    df = pd.read_sql_table("cache_cost_assumptions", engine)
+    # Normalize column names
+    col_map = {}
+    for c in df.columns:
+        cl = c.lower()
+        if cl == "sku": col_map[c] = "SKU"
+        elif cl == "inbound_freight": col_map[c] = "Inbound_Freight"
+        elif cl == "warehouse_storage": col_map[c] = "Warehouse_Storage"
+        elif cl == "amazon_fba": col_map[c] = "Amazon_FBA"
+        elif cl == "expected_product_life": col_map[c] = "Expected_Product_Life"
+    df = df.rename(columns=col_map)
+
+    dir_df = pd.read_sql_table("cache_product_directory", engine)
+    dir_df = dir_df.rename(columns={"sku": "SKU", "product_name": "Product Name", "reference_sku": "Reference SKU"})
+except Exception as e:
+    st.error(f"Database connection failed: {e}")
+    st.stop()
 
 if df.empty:
-    st.warning("No cost assumption data found.")
+    st.warning("No cost assumption data found. Run CSV Sync from DB Admin page.")
     st.stop()
 
 # Merge with product directory for Product Name and Reference SKU
-dir_df = load_product_directory()
 dir_info = dir_df[["SKU", "Product Name", "Reference SKU"]].drop_duplicates(subset="SKU") if "Product Name" in dir_df.columns and "Reference SKU" in dir_df.columns else dir_df[["SKU"]].drop_duplicates()
 df = df.merge(dir_info, on="SKU", how="left")
 # Reorder columns: SKU, Product Name, Reference SKU, then the rest

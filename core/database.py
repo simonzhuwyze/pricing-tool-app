@@ -2,13 +2,13 @@
 Azure SQL Database Connection & Operations Module
 
 Two types of tables:
-1. Override tables - Store user modifications (what was on SharePoint Lists)
-2. Cache tables - Mirror Snowflake data for faster reads
+1. Admin/Cache tables - Store working data (initially loaded from CSV, maintained via UI)
+2. SF snapshot tables - Mirror Snowflake data for validation comparison
 
 Architecture:
-  App ──read/write──> Azure SQL (overrides + cache)
-  Snowflake ──sync──> Azure SQL (cache only, via scheduled job)
-  Priority: User Override > Snowflake Cache > CSV Default
+  CSV files ──initial import──> Azure SQL (cache tables, one-time sync)
+  Snowflake ──sync──> Azure SQL (SF snapshot tables, for comparison)
+  App ──read/write──> Azure SQL (single source of truth, no CSV runtime fallback)
 """
 
 import os
@@ -853,7 +853,7 @@ def sync_csv_to_cache():
 
 
 # ---------------------------------------------------------------------------
-# Merged Data Loader (Override > Cache > CSV fallback)
+# Merged Data Loader (Override > Cache — DB only)
 # ---------------------------------------------------------------------------
 
 def load_merged_data(sku: str) -> dict:
@@ -861,35 +861,22 @@ def load_merged_data(sku: str) -> dict:
     Load data for a SKU with override priority:
       1. User Override (Azure SQL user_overrides table)
       2. Cache data (Azure SQL cache tables)
-      3. CSV fallback (local files)
 
     Returns dict of DataFrames ready for CPAM calculation.
     """
-    try:
-        engine = get_sqlalchemy_engine()
-        use_db = True
-    except Exception:
-        use_db = False
+    engine = get_sqlalchemy_engine()
 
-    if use_db:
-        # Load from cache tables
-        products = pd.read_sql(
-            f"SELECT * FROM cache_product_directory WHERE sku = '{sku}'", engine
-        )
-        overrides = pd.read_sql(
-            f"SELECT * FROM user_overrides WHERE sku = '{sku}'", engine
-        )
-    else:
-        # Fallback to CSV
-        from core.data_loader import load_product_directory
-        products = load_product_directory()
-        products = products[products["SKU"] == sku]
-        overrides = pd.DataFrame()
+    products = pd.read_sql(
+        f"SELECT * FROM cache_product_directory WHERE sku = '{sku}'", engine
+    )
+    overrides = pd.read_sql(
+        f"SELECT * FROM user_overrides WHERE sku = '{sku}'", engine
+    )
 
     return {
         "products": products,
         "overrides": overrides,
-        "source": "azure_sql" if use_db else "csv",
+        "source": "azure_sql",
     }
 
 

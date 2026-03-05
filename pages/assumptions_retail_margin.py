@@ -19,25 +19,34 @@ if env_path.exists():
             key, val = line.split("=", 1)
             os.environ[key.strip()] = val.strip().strip('"').strip("'")
 
-from core.data_loader import load_retail_margin, RETAIL_CHANNELS, load_product_directory
 from core.ui_helpers import styled_header, styled_divider
 from core.auth import require_permission
 
 styled_header("Retail Margin (PO Discount)", "PO discount rates per SKU per retail channel. Values are decimals (0.20 = 20% discount off MSRP).")
 require_permission("edit_assumptions", "Retail Margin")
 
-# Load data
-df = load_retail_margin()
+# Load data from Azure SQL
+try:
+    from core.database import get_sqlalchemy_engine
+    engine = get_sqlalchemy_engine()
+
+    df = pd.read_sql_table("cache_po_discount", engine)
+    df = df.rename(columns={c: {"sku": "SKU", "channel": "Channel", "po_discount_rate": "PO_Discount_Rate"}.get(c.lower(), c) for c in df.columns})
+
+    dir_df = pd.read_sql_table("cache_product_directory", engine)
+    dir_df = dir_df.rename(columns={"sku": "SKU", "product_name": "Product Name", "reference_sku": "Reference SKU"})
+except Exception as e:
+    st.error(f"Database connection failed: {e}")
+    st.stop()
 
 if df.empty:
-    st.warning("No retail margin data found.")
+    st.warning("No retail margin data found. Run CSV Sync from DB Admin page.")
     st.stop()
 
 # Pivot for display: SKU x Channel
 pivot = df.pivot_table(index="SKU", columns="Channel", values="PO_Discount_Rate")
 
-# Load product directory for Product Name and Reference SKU
-dir_df = load_product_directory()
+# Product Name and Reference SKU
 sku_to_name = dict(zip(dir_df["SKU"], dir_df.get("Product Name", pd.Series(dtype=str))))
 sku_to_ref = dict(zip(dir_df["SKU"], dir_df.get("Reference SKU", pd.Series(dtype=str))))
 

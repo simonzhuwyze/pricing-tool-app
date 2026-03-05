@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.data_loader import CHANNELS, load_sku_mapping
+from core.data_loader import CHANNELS
 from core.ui_helpers import styled_header
 
 styled_header("Channel Mix", "Edit sales distribution by channel. Smart Fill from Snowflake historical data.")
@@ -86,16 +86,15 @@ def _load_hierarchy():
     except Exception:
         pass
 
-    # CSV fallback (always try)
-    df = load_sku_mapping()
-    return _normalize_hierarchy(df)
+    # No CSV fallback — DB is the single source of truth
+    return pd.DataFrame(columns=["Product_Group", "Product_Category", "Product_Line"])
 
 
 hierarchy_df = _load_hierarchy()
 
 # Refresh button if hierarchy is empty
 if hierarchy_df.empty:
-    st.warning("SKU mapping data not loaded. Try refreshing or run CSV Sync from DB Admin page.")
+    st.warning("SKU mapping data not loaded. Try refreshing or run Snowflake Sync from DB Admin page.")
     if st.button("Refresh SKU Mapping"):
         _load_hierarchy.clear()
         st.rerun()
