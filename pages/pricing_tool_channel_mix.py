@@ -40,27 +40,11 @@ st.subheader("1. Select Product Line for Channel Mix")
 st.caption("Choose which Product Line's historical channel mix to use for Smart Fill.")
 
 # --- Load SKU mapping for the cascading dropdown ---
-@st.cache_data(ttl=300)
-def _load_hierarchy():
-    """Load the full Product Group -> Category -> Line hierarchy."""
-    try:
-        from core.database import get_sqlalchemy_engine
-        engine = get_sqlalchemy_engine()
-        df = pd.read_sql_table("cache_sku_mapping", engine)
-        # Check if DB has product_category column
-        cols_lower = [c.lower() for c in df.columns]
-        if "product_category" not in cols_lower:
-            df = None  # DB is stale (missing product_category), fallback to CSV
-    except Exception:
-        df = None
-
+def _normalize_hierarchy(df):
+    """Normalize column names and build hierarchy from raw SKU mapping DataFrame."""
     if df is None or df.empty:
-        df = load_sku_mapping()
-
-    if df.empty:
         return pd.DataFrame(columns=["Product_Group", "Product_Category", "Product_Line"])
 
-    # Normalize columns
     col_map = {}
     for c in df.columns:
         cl = c.lower().replace(" ", "_")
@@ -77,7 +61,6 @@ def _load_hierarchy():
         return pd.DataFrame(columns=["Product_Group", "Product_Category", "Product_Line"])
 
     hierarchy = df[keep].drop_duplicates().dropna(subset=["Product_Line"])
-    # Fill missing category with "Other"
     if "Product_Category" not in hierarchy.columns:
         hierarchy["Product_Category"] = "Other"
     hierarchy["Product_Group"] = hierarchy["Product_Group"].fillna("Unknown")
@@ -85,7 +68,37 @@ def _load_hierarchy():
     return hierarchy.sort_values(["Product_Group", "Product_Category", "Product_Line"]).reset_index(drop=True)
 
 
+@st.cache_data(ttl=300)
+def _load_hierarchy():
+    """Load the full Product Group -> Category -> Line hierarchy."""
+    # Try DB first
+    try:
+        from core.database import get_sqlalchemy_engine
+        engine = get_sqlalchemy_engine()
+        df = pd.read_sql_table("cache_sku_mapping", engine)
+        cols_lower = [c.lower() for c in df.columns]
+        if "product_category" not in cols_lower:
+            df = None
+        elif not df.empty:
+            result = _normalize_hierarchy(df)
+            if not result.empty:
+                return result
+    except Exception:
+        pass
+
+    # CSV fallback (always try)
+    df = load_sku_mapping()
+    return _normalize_hierarchy(df)
+
+
 hierarchy_df = _load_hierarchy()
+
+# Refresh button if hierarchy is empty
+if hierarchy_df.empty:
+    st.warning("SKU mapping data not loaded. Try refreshing or run CSV Sync from DB Admin page.")
+    if st.button("Refresh SKU Mapping"):
+        _load_hierarchy.clear()
+        st.rerun()
 
 # --- Build quick-pick options ---
 current_pl = resolved.product_info.product_line or ""
@@ -147,45 +160,44 @@ if selected_option == MANUAL_LABEL:
     st.caption("Drill down: Product Group -> Product Category -> Product Line")
 
     if hierarchy_df.empty:
-        st.warning("No SKU mapping data available for manual selection.")
-        st.stop()
+        st.warning("No SKU mapping data available for manual selection. You can still enter channel mix manually below.")
+        chosen_pl = ""
+    else:
+        col_g, col_c, col_l = st.columns(3)
 
-    col_g, col_c, col_l = st.columns(3)
+        # Level 1: Product Group
+        groups = sorted(hierarchy_df["Product_Group"].unique())
+        with col_g:
+            default_group_idx = 0
+            if resolved.product_info.product_group and resolved.product_info.product_group in groups:
+                default_group_idx = groups.index(resolved.product_info.product_group)
+            sel_group = st.selectbox("Product Group", groups, index=default_group_idx, key="manual_pg")
 
-    # Level 1: Product Group
-    groups = sorted(hierarchy_df["Product_Group"].unique())
-    with col_g:
-        # Default to resolved product_group if available
-        default_group_idx = 0
-        if resolved.product_info.product_group and resolved.product_info.product_group in groups:
-            default_group_idx = groups.index(resolved.product_info.product_group)
-        sel_group = st.selectbox("Product Group", groups, index=default_group_idx, key="manual_pg")
+        # Level 2: Product Category (filtered by group)
+        cats_filtered = hierarchy_df[hierarchy_df["Product_Group"] == sel_group]["Product_Category"].unique()
+        cats = sorted(cats_filtered)
+        with col_c:
+            default_cat_idx = 0
+            if resolved.product_info.product_category and resolved.product_info.product_category in cats:
+                default_cat_idx = cats.index(resolved.product_info.product_category)
+            sel_cat = st.selectbox("Product Category", cats, index=default_cat_idx, key="manual_pc")
 
-    # Level 2: Product Category (filtered by group)
-    cats_filtered = hierarchy_df[hierarchy_df["Product_Group"] == sel_group]["Product_Category"].unique()
-    cats = sorted(cats_filtered)
-    with col_c:
-        default_cat_idx = 0
-        if resolved.product_info.product_category and resolved.product_info.product_category in cats:
-            default_cat_idx = cats.index(resolved.product_info.product_category)
-        sel_cat = st.selectbox("Product Category", cats, index=default_cat_idx, key="manual_pc")
+        # Level 3: Product Line (filtered by group + category)
+        lines_filtered = hierarchy_df[
+            (hierarchy_df["Product_Group"] == sel_group) &
+            (hierarchy_df["Product_Category"] == sel_cat)
+        ]["Product_Line"].unique()
+        lines = sorted(lines_filtered)
+        with col_l:
+            default_line_idx = 0
+            if saved_pl and saved_pl in lines:
+                default_line_idx = lines.index(saved_pl)
+            elif resolved.product_info.product_line and resolved.product_info.product_line in lines:
+                default_line_idx = lines.index(resolved.product_info.product_line)
+            sel_line = st.selectbox("Product Line", lines, index=default_line_idx, key="manual_pl")
 
-    # Level 3: Product Line (filtered by group + category)
-    lines_filtered = hierarchy_df[
-        (hierarchy_df["Product_Group"] == sel_group) &
-        (hierarchy_df["Product_Category"] == sel_cat)
-    ]["Product_Line"].unique()
-    lines = sorted(lines_filtered)
-    with col_l:
-        default_line_idx = 0
-        if saved_pl and saved_pl in lines:
-            default_line_idx = lines.index(saved_pl)
-        elif resolved.product_info.product_line and resolved.product_info.product_line in lines:
-            default_line_idx = lines.index(resolved.product_info.product_line)
-        sel_line = st.selectbox("Product Line", lines, index=default_line_idx, key="manual_pl")
-
-    chosen_pl = sel_line
-    st.info(f"Manual selection: **{sel_group}** > **{sel_cat}** > **{sel_line}**")
+        chosen_pl = sel_line
+        st.info(f"Manual selection: **{sel_group}** > **{sel_cat}** > **{sel_line}**")
 else:
     chosen_pl = quick_option_map.get(selected_option, current_pl)
 
