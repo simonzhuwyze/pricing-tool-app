@@ -115,9 +115,14 @@ if quick_select:
 # ===========================================================================
 # Edit Existing Product (dialog)
 # ===========================================================================
+from core.auth import has_permission
+_can_edit = has_permission("create_sku")
+
 styled_divider(label="Edit Product", icon="pencil-square")
 
-if not db_available:
+if not _can_edit:
+    st.info("View-only mode. Contact an admin for edit/create permissions.")
+elif not db_available:
     st.warning("Database connection required. Check Settings > DB Admin.")
 else:
     existing_skus = sorted(products["SKU"].unique().tolist())
@@ -251,7 +256,9 @@ else:
 # ===========================================================================
 styled_divider(label="Create New SKU", icon="plus-circle-fill")
 
-if not db_available:
+if not _can_edit:
+    st.info("View-only mode. Contact an admin for edit/create permissions.")
+elif not db_available:
     st.warning("Database connection required to create new SKUs. Check DB connection in Settings > DB Admin.")
 else:
     with st.expander("Add a new product and clone assumptions from Reference SKU", expanded=False):

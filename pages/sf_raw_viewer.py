@@ -12,7 +12,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.ui_helpers import styled_header
+from core.auth import require_permission
 styled_header("Snowflake Raw Data", "Browse cached Snowflake data synced to Azure SQL. Use DB Admin to trigger a new sync.", color="cyan")
+require_permission("sync_snowflake", "SF Raw Data")
 
 # --- Check DB connection ---
 engine = None

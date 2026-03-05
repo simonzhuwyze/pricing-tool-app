@@ -30,9 +30,11 @@ if env_path.exists():
 
 
 from core.ui_helpers import styled_header, styled_divider, styled_tabs
+from core.auth import require_permission
 import streamlit_antd_components as sac
 
 styled_header("Finance Assumptions", "Internal assumptions managed by Finance. All data stored in Azure SQL.", color="indigo")
+require_permission("edit_assumptions", "Finance Assumptions")
 
 # Check DB connection (required)
 try:

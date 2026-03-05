@@ -21,8 +21,10 @@ if env_path.exists():
 
 from core.data_loader import load_retail_margin, RETAIL_CHANNELS, load_product_directory
 from core.ui_helpers import styled_header, styled_divider
+from core.auth import require_permission
 
 styled_header("Retail Margin (PO Discount)", "PO discount rates per SKU per retail channel. Values are decimals (0.20 = 20% discount off MSRP).")
+require_permission("edit_assumptions", "Retail Margin")
 
 # Load data
 df = load_retail_margin()

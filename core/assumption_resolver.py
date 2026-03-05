@@ -61,21 +61,49 @@ class ResolvedAssumptions:
 
 
 # ---------------------------------------------------------------------------
-# Internal caches (loaded once per session)
+# Internal caches (Streamlit-safe when available, fallback to dict)
 # ---------------------------------------------------------------------------
-_cache: dict = {}
+try:
+    import streamlit as st
 
+    @st.cache_data(ttl=300)
+    def _cached_load(key: str):
+        """Load and cache CSV data by key. TTL=5min, Streamlit-managed."""
+        _loaders = {
+            "product_directory": load_product_directory,
+            "sku_mapping": load_sku_mapping,
+            "retail_margin": load_retail_margin,
+            "return_rate": load_return_rate_by_sku,
+            "outbound_shipping": load_outbound_shipping,
+            "cost_assumptions": load_cost_assumptions,
+            "channel_terms": load_channel_terms,
+            "sm_expenses": load_sm_expenses,
+            "static_cost_assumptions": load_static_cost_assumptions,
+        }
+        loader = _loaders.get(key)
+        if loader:
+            return loader()
+        return pd.DataFrame()
 
-def _get_cached(key: str, loader):
-    """Cache CSV data in module-level dict (resets on restart)."""
-    if key not in _cache:
-        _cache[key] = loader()
-    return _cache[key]
+    def _get_cached(key: str, loader):
+        """Cache CSV data via Streamlit cache."""
+        return _cached_load(key)
 
+    def clear_cache():
+        """Clear the Streamlit data cache."""
+        _cached_load.clear()
 
-def clear_cache():
-    """Clear the data cache (call after CSV sync or data change)."""
-    _cache.clear()
+except ImportError:
+    # Non-Streamlit fallback (CLI scripts, tests)
+    _cache: dict = {}
+
+    def _get_cached(key: str, loader):
+        if key not in _cache:
+            _cache[key] = loader()
+        return _cache[key]
+
+    def clear_cache():
+        _cache.clear()
 
 
 # ---------------------------------------------------------------------------

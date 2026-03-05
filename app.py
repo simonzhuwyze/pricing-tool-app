@@ -23,7 +23,7 @@ st.set_page_config(
 # --- Authentication Gate (JumpCloud SSO) ---
 # When AUTH_ENABLED=false (default): no impact, returns local_user stub.
 # When AUTH_ENABLED=true: redirects to JumpCloud login, enforces roles.
-from core.auth import require_auth, show_user_info, AUTH_ENABLED
+from core.auth import require_auth, show_user_info, AUTH_ENABLED, has_permission
 
 if AUTH_ENABLED:
     user_info = require_auth()
@@ -149,15 +149,33 @@ sf_raw_viewer = st.Page(
     title="SF Raw Data",
     icon="❄",
 )
+user_mgmt = st.Page(
+    "pages/user_management.py",
+    title="User Management",
+    icon="👥",
+)
 
-# --- Navigation ---
-pg = st.navigation({
+# --- Navigation (role-based filtering) ---
+nav_pages = {
     "Product Directory": [product_directory],
     "Pricing Tool": [pt_main, pt_cpam, pt_channel_mix, pt_sensitivity, pt_assumptions, pt_export],
     "Reference": [templates, formula_ref, user_guide],
-    "Assumptions": [a_retail_margin, a_return_rate, a_outbound, a_product_costs, a_finance],
-    "Settings": [db_admin, data_validation, sf_raw_viewer],
-})
+}
+
+if has_permission("edit_assumptions"):
+    nav_pages["Assumptions"] = [a_retail_margin, a_return_rate, a_outbound, a_product_costs, a_finance]
+
+settings_pages = []
+if has_permission("validate_data"):
+    settings_pages.append(data_validation)
+if has_permission("sync_snowflake"):
+    settings_pages.append(sf_raw_viewer)
+if has_permission("db_admin"):
+    settings_pages.extend([db_admin, user_mgmt])
+if settings_pages:
+    nav_pages["Settings"] = settings_pages
+
+pg = st.navigation(nav_pages)
 
 # Show user info in sidebar (only when auth is enabled)
 show_user_info()

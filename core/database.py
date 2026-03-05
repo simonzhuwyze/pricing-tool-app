@@ -109,15 +109,20 @@ def get_connection():
     return pyodbc.connect(conn_str)
 
 
-_cached_engine = None
-
-
 def get_sqlalchemy_engine():
     """Get a cached SQLAlchemy engine for pandas read/write operations."""
-    global _cached_engine
-    if _cached_engine is not None:
-        return _cached_engine
+    # Try Streamlit cache first (preferred for concurrency safety)
+    try:
+        import streamlit as st
+        return _get_cached_engine()
+    except Exception:
+        pass
+    # Fallback for non-Streamlit contexts (CLI scripts, tests)
+    return _create_engine_instance()
 
+
+def _create_engine_instance():
+    """Create a new SQLAlchemy engine instance."""
     from sqlalchemy import create_engine
     from urllib.parse import quote_plus
 
@@ -125,12 +130,23 @@ def get_sqlalchemy_engine():
     if not conn_str:
         raise ConnectionError("Azure SQL connection string not found.")
 
-    _cached_engine = create_engine(
+    return create_engine(
         f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}",
         pool_pre_ping=True,
         pool_recycle=300,
     )
-    return _cached_engine
+
+
+try:
+    import streamlit as st
+
+    @st.cache_resource
+    def _get_cached_engine():
+        """Streamlit-cached engine (process-level singleton)."""
+        return _create_engine_instance()
+except ImportError:
+    def _get_cached_engine():
+        return _create_engine_instance()
 
 
 def test_connection() -> dict:
@@ -451,6 +467,21 @@ CREATE TABLE cache_channel_mix (
     product_line    NVARCHAR(100)  NULL,
     quantity        FLOAT          NULL,
     synced_at       DATETIME2      DEFAULT GETUTCDATE()
+);
+
+-- =====================================================
+-- User Roles (for RBAC)
+-- =====================================================
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'user_roles')
+CREATE TABLE user_roles (
+    id          INT IDENTITY(1,1) PRIMARY KEY,
+    email       NVARCHAR(200) NOT NULL UNIQUE,
+    role        NVARCHAR(20)  NOT NULL DEFAULT 'viewer',
+    name        NVARCHAR(200) NULL,
+    last_login  DATETIME2     NULL,
+    created_by  NVARCHAR(100) DEFAULT 'system',
+    created_at  DATETIME2     DEFAULT GETUTCDATE(),
+    updated_at  DATETIME2     DEFAULT GETUTCDATE()
 );
 """
 
@@ -908,6 +939,8 @@ def get_table_counts() -> dict:
             # Template tables
             "pricing_templates", "pricing_template_channel_mix",
             "pricing_template_assumptions",
+            # Auth
+            "user_roles",
         ]
         counts = {}
         for t in tables:
@@ -1267,3 +1300,84 @@ def batch_resolve_validation(
     conn.commit()
     conn.close()
     return count
+
+
+# ---------------------------------------------------------------------------
+# User Role Management (RBAC)
+# ---------------------------------------------------------------------------
+
+def get_user_role(email: str) -> str:
+    """Get role for a user email. Falls back to DEFAULT_ROLE if not found."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM user_roles WHERE email = ?", (email.lower(),))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return row[0]
+    except Exception:
+        pass
+    return "editor"  # DEFAULT_ROLE
+
+
+def set_user_role(email: str, role: str, name: str = None, updated_by: str = "admin"):
+    """Insert or update a user role."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        MERGE user_roles AS target
+        USING (SELECT ? AS email) AS source
+        ON target.email = source.email
+        WHEN MATCHED THEN
+            UPDATE SET role = ?, name = COALESCE(?, target.name),
+                       updated_at = GETUTCDATE()
+        WHEN NOT MATCHED THEN
+            INSERT (email, role, name, created_by)
+            VALUES (?, ?, ?, ?);
+    """, (email.lower(), role, name, email.lower(), role, name, updated_by))
+    conn.commit()
+    conn.close()
+
+
+def delete_user_role(email: str):
+    """Remove a user role entry."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM user_roles WHERE email = ?", (email.lower(),))
+    conn.commit()
+    conn.close()
+
+
+def list_all_users() -> pd.DataFrame:
+    """List all users and their roles."""
+    try:
+        engine = get_sqlalchemy_engine()
+        return pd.read_sql(
+            "SELECT email, role, name, last_login, created_at, updated_at FROM user_roles ORDER BY email",
+            engine,
+        )
+    except Exception:
+        return pd.DataFrame(columns=["email", "role", "name", "last_login", "created_at", "updated_at"])
+
+
+def update_last_login(email: str, name: str = None):
+    """Update last_login timestamp. Creates user entry if not exists."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            MERGE user_roles AS target
+            USING (SELECT ? AS email) AS source
+            ON target.email = source.email
+            WHEN MATCHED THEN
+                UPDATE SET last_login = GETUTCDATE(),
+                           name = COALESCE(?, target.name)
+            WHEN NOT MATCHED THEN
+                INSERT (email, role, name, last_login, created_by)
+                VALUES (?, 'editor', ?, GETUTCDATE(), 'auto');
+        """, (email.lower(), name, email.lower(), name))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass

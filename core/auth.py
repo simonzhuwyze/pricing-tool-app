@@ -93,14 +93,7 @@ ROLES = {
     },
 }
 
-# Email -> Role mapping (configure as needed)
-# When using JumpCloud groups, this can be derived from the token claims.
-ROLE_MAP = {
-    # "simon.zhu@wyze.com": "admin",
-    # Add user -> role mappings here
-}
-
-DEFAULT_ROLE = "editor"  # Default role for authenticated users not in ROLE_MAP
+DEFAULT_ROLE = "editor"  # Default role for authenticated users not in user_roles table
 
 
 # ---------------------------------------------------------------------------
@@ -221,8 +214,13 @@ def _exchange_code(code: str) -> Optional[dict]:
         email = userinfo.get("email", "unknown@wyze.com")
         name = userinfo.get("name", email.split("@")[0])
 
-        # Determine role
-        role = ROLE_MAP.get(email, DEFAULT_ROLE)
+        # Determine role from DB (falls back to DEFAULT_ROLE)
+        try:
+            from core.database import get_user_role, update_last_login
+            role = get_user_role(email)
+            update_last_login(email, name)
+        except Exception:
+            role = DEFAULT_ROLE
 
         return {
             "email": email,
@@ -272,6 +270,20 @@ def has_permission(action: str) -> bool:
     role = get_current_role()
     permissions = ROLES.get(role, ROLES["viewer"])
     return permissions.get(action, False)
+
+
+def require_permission(action: str, page_label: str = ""):
+    """
+    Page-level permission gate. Shows warning and stops if user lacks permission.
+    No-op when AUTH_ENABLED=false (local dev).
+    """
+    if not AUTH_ENABLED:
+        return
+    if not has_permission(action):
+        import streamlit as st
+        st.warning(f"You don't have permission to access {page_label}. Current role: {get_current_role()}")
+        st.info("Please contact an admin for access.")
+        st.stop()
 
 
 def logout():

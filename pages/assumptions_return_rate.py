@@ -21,8 +21,10 @@ if env_path.exists():
 
 from core.data_loader import load_return_rate_by_sku, load_product_directory
 from core.ui_helpers import styled_header, styled_divider, styled_metric_cards
+from core.auth import require_permission
 
 styled_header("Return Rate", "Return rates per SKU per channel. Values are decimals (0.05 = 5% return rate).")
+require_permission("edit_assumptions", "Return Rate")
 
 # Load data
 df = load_return_rate_by_sku()

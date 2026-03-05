@@ -14,9 +14,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.ui_helpers import styled_header, styled_divider, styled_metric_cards, styled_tabs
+from core.auth import require_permission
 import streamlit_antd_components as sac
 
 styled_header("Data Validation", "Compare per-SKU cache assumptions against Snowflake source data. Resolve conflicts individually or in batch.")
+require_permission("validate_data", "Data Validation")
 
 # --- Check DB connection ---
 engine = None

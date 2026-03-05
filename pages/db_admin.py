@@ -77,12 +77,14 @@ def _convert_adonet_to_pyodbc(conn_str: str) -> str:
 
 
 from core.ui_helpers import styled_header, styled_divider, styled_metric_cards
+from core.auth import require_permission
 import streamlit_antd_components as sac
 
 # ---------------------------------------------------------------------------
 # Page UI
 # ---------------------------------------------------------------------------
 styled_header("Database Admin", "Azure SQL Database connection, data sync, and override management", color="indigo")
+require_permission("db_admin", "DB Admin")
 
 # --- Connection Configuration ---
 styled_divider(label="1. Connection Configuration", icon="plug-fill")

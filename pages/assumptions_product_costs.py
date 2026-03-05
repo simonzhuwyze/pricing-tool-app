@@ -22,8 +22,10 @@ if env_path.exists():
 
 from core.data_loader import load_cost_assumptions, load_product_directory
 from core.ui_helpers import styled_header, styled_divider
+from core.auth import require_permission
 
 styled_header("Product Cost Assumptions", "Per-SKU cost parameters: inbound freight, warehouse storage, Amazon FBA fees, and expected product life.")
+require_permission("edit_assumptions", "Product Costs")
 
 # Load data
 df = load_cost_assumptions()

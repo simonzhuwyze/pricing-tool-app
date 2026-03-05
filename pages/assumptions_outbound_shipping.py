@@ -22,8 +22,10 @@ if env_path.exists():
 
 from core.data_loader import load_outbound_shipping, load_product_directory
 from core.ui_helpers import styled_header, styled_divider
+from core.auth import require_permission
 
 styled_header("Outbound Shipping", "Outbound shipping costs per SKU per channel. Values in USD per unit.")
+require_permission("edit_assumptions", "Outbound Shipping")
 
 # Try loading from DB first, then CSV
 db_connected = False
