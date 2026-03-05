@@ -16,7 +16,7 @@ from core.cpam_engine import (
 )
 from core.assumption_resolver import resolve_all_assumptions, clear_cache
 from core.ui_helpers import styled_header, styled_divider, styled_metric_cards, styled_segmented
-import streamlit_antd_components as sac
+
 
 
 # ---------------------------------------------------------------------------
@@ -350,21 +350,10 @@ else:
 # 6. Quick Links
 # ---------------------------------------------------------------------------
 styled_divider(label="Quick Links", icon="link-45deg")
-nav_btn = sac.buttons(
-    items=[
-        sac.ButtonsItem(label="CPAM Breakdown", icon="calculator"),
-        sac.ButtonsItem(label="Channel Mix", icon="pie-chart"),
-        sac.ButtonsItem(label="Assumptions", icon="clipboard-data"),
-    ],
-    align="center",
-    variant="outline",
-    color="teal",
-    use_container_width=True,
-    key="pt_quick_links",
-)
-if nav_btn == "CPAM Breakdown":
-    st.switch_page("pages/pricing_tool_cpam.py")
-elif nav_btn == "Channel Mix":
-    st.switch_page("pages/pricing_tool_channel_mix.py")
-elif nav_btn == "Assumptions":
-    st.switch_page("pages/pricing_tool_assumptions.py")
+link_cols = st.columns(3)
+with link_cols[0]:
+    st.page_link("pages/pricing_tool_cpam.py", label="CPAM Breakdown", icon="🧮")
+with link_cols[1]:
+    st.page_link("pages/pricing_tool_channel_mix.py", label="Channel Mix", icon="📊")
+with link_cols[2]:
+    st.page_link("pages/pricing_tool_assumptions.py", label="Assumptions", icon="📋")
