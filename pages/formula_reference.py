@@ -125,6 +125,27 @@ st.markdown("""
 
 st.info("💡 **Amazon 3P special rule**: CC & Platform Fees adds a fixed 0.99/unit on top of the rate-based calculation.")
 
+st.subheader("Marketing Budget Rates by Channel")
+st.markdown("""
+| Channel | Marketing Rate | Notes |
+|---------|---------------|-------|
+| DTC US | 5.7% | |
+| DTC CA | 5.7% | |
+| TikTok Shop | 37.9% | |
+| Amazon 1P | 12.7% | |
+| Home Depot US | 11.0% | |
+| Home Depot CA | 11.0% | |
+| Best Buy | 41.6% | |
+| Costco | 13.5% | |
+| Costco.com | 13.5% | |
+| Amazon 3P | 10.2% | |
+| ACE | 13.4% | |
+| Walmart 1P | 22.2% | |
+| New Channel 2 | 13.4% | |
+
+Marketing expense is calculated as `Marketing Rate × MSRP` per unit.
+""")
+
 # ===== PROFIT METRICS =====
 st.divider()
 st.header("Profit Metrics", anchor="profit-metrics")
