@@ -303,57 +303,32 @@ else:
             for _, row in products.iterrows()
         ]
 
-        col_a, col_b = st.columns(2)
-        with col_a:
-            new_sku = st.text_input("New SKU", placeholder="e.g. WYZECPAN-V3", key="new_sku_input")
-        with col_b:
-            new_name = st.text_input("Product Name", placeholder="e.g. Wyze Cam Pan v3", key="new_name_input")
+        with st.form(key="create_sku_form"):
+            col_a, col_b = st.columns(2)
+            with col_a:
+                new_sku = st.text_input("New SKU", placeholder="e.g. WYZECPAN-V3", key="new_sku_input")
+            with col_b:
+                new_name = st.text_input("Product Name", placeholder="e.g. Wyze Cam Pan v3", key="new_name_input")
 
-        ref_select = st.selectbox(
-            "Reference SKU (clone assumptions from)",
-            ref_options,
-            key="new_ref_sku_select",
-            help="All assumptions (PO Discount, Return Rate, Outbound Shipping, Product Costs) will be cloned from this SKU.",
-        )
-        ref_sku_val = ref_select.split(" - ")[0].strip() if ref_select else ""
+            ref_select = st.selectbox(
+                "Reference SKU (clone assumptions from)",
+                ref_options,
+                key="new_ref_sku_select",
+                help="All assumptions (PO Discount, Return Rate, Outbound Shipping, Product Costs) will be cloned from this SKU.",
+            )
 
-        col_c, col_d, col_e = st.columns(3)
-        with col_c:
-            new_msrp = st.number_input("Default MSRP ($)", min_value=0.0, value=0.0, step=1.0, key="new_msrp")
-        with col_d:
-            new_fob = st.number_input("Default FOB ($)", min_value=0.0, value=0.0, step=0.5, key="new_fob")
-        with col_e:
-            new_tariff = st.number_input("Default Tariff Rate (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="new_tariff")
+            col_c, col_d, col_e = st.columns(3)
+            with col_c:
+                new_msrp = st.number_input("Default MSRP ($)", min_value=0.0, value=0.0, step=1.0, key="new_msrp")
+            with col_d:
+                new_fob = st.number_input("Default FOB ($)", min_value=0.0, value=0.0, step=0.5, key="new_fob")
+            with col_e:
+                new_tariff = st.number_input("Default Tariff Rate (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="new_tariff")
 
-        # Pre-check: show what will be cloned
-        if ref_sku_val:
-            try:
-                counts = {}
-                for tbl, col in [
-                    ("cache_po_discount", "sku"),
-                    ("cache_return_rate_sku", "sku"),
-                    ("cache_outbound_shipping", "sku"),
-                    ("cache_cost_assumptions", "sku"),
-                ]:
-                    try:
-                        df_check = pd.read_sql(
-                            f"SELECT COUNT(*) as cnt FROM {tbl} WHERE {col} = '{ref_sku_val}'", engine
-                        )
-                        counts[tbl] = int(df_check.iloc[0]["cnt"])
-                    except Exception:
-                        counts[tbl] = 0
-                total_rows = sum(counts.values())
-                st.info(
-                    f"Will clone **{total_rows}** assumption records from **{ref_sku_val}**: "
-                    f"PO Discount ({counts.get('cache_po_discount', 0)}), "
-                    f"Return Rate ({counts.get('cache_return_rate_sku', 0)}), "
-                    f"Outbound Shipping ({counts.get('cache_outbound_shipping', 0)}), "
-                    f"Product Costs ({counts.get('cache_cost_assumptions', 0)})"
-                )
-            except Exception:
-                st.caption("(Cannot preview clone count - DB issue)")
+            submitted = st.form_submit_button("Create SKU & Clone Assumptions", type="primary")
 
-        if st.button("Create SKU & Clone Assumptions", type="primary", key="btn_create_sku"):
+        if submitted:
+            ref_sku_val = ref_select.split(" - ")[0].strip() if ref_select else ""
             if not new_sku.strip():
                 st.error("SKU cannot be empty.")
             elif not new_name.strip():
