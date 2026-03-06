@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from core.snowflake_sync import sync_all
 
 print("=" * 60)
-print("Snowflake → Azure SQL Full Sync")
+print("Snowflake -> Azure SQL Full Sync")
 print("=" * 60)
 print("\nConnecting to Snowflake (check your browser for SSO)...\n")
 
@@ -23,8 +23,8 @@ print("Sync Results:")
 print("=" * 60)
 for table, count in results.items():
     if isinstance(count, int):
-        print(f"  ✅ {table}: {count:,} rows")
+        print(f"  [OK] {table}: {count:,} rows")
     else:
-        print(f"  ❌ {table}: {count}")
+        print(f"  [FAIL] {table}: {count}")
 
 print("\nDone!")
