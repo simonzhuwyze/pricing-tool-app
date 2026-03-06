@@ -180,10 +180,10 @@ def save_template(
             INSERT INTO pricing_templates
             (template_key, sku, template_name, created_by, msrp, fob, tariff_rate,
              promotion_mix, promo_percentage, notes)
+            OUTPUT INSERTED.id
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (template_key, sku, template_name, user, msrp, fob, tariff_rate,
               promotion_mix, promo_percentage, notes))
-        cursor.execute("SELECT SCOPE_IDENTITY()")
         template_id = int(cursor.fetchone()[0])
 
     # Insert channel mix
