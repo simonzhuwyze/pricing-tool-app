@@ -130,11 +130,16 @@ def _create_engine_instance():
     if not conn_str:
         raise ConnectionError("Azure SQL connection string not found.")
 
+    # Ensure connection timeout is set in the ODBC string
+    if "Connection Timeout" not in conn_str:
+        conn_str = conn_str.rstrip(";") + ";Connection Timeout=15;"
+
     engine = create_engine(
         f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}",
         pool_pre_ping=True,
         pool_recycle=300,
         pool_reset_on_return="rollback",
+        pool_timeout=10,  # Max seconds to wait for a pool connection
     )
 
     # Auto-rollback on connection checkout to prevent PendingRollbackError

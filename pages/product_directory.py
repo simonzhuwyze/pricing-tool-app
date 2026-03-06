@@ -41,17 +41,20 @@ except Exception:
 # ---------------------------------------------------------------------------
 def _load_products_from_db():
     """Load product directory from Azure SQL."""
-    df = pd.read_sql_table("cache_product_directory", engine)
-    col_map = {}
-    for c in df.columns:
-        cl = c.lower()
-        if cl == "sku": col_map[c] = "SKU"
-        elif cl == "product_name": col_map[c] = "Product Name"
-        elif cl == "reference_sku": col_map[c] = "Reference SKU"
-        elif cl == "default_msrp": col_map[c] = "Default MSRP"
-        elif cl == "default_fob": col_map[c] = "Default FOB"
-        elif cl == "default_tariff_rate": col_map[c] = "Default Tariff Rate"
-    return df.rename(columns=col_map)
+    try:
+        df = pd.read_sql_table("cache_product_directory", engine)
+        col_map = {}
+        for c in df.columns:
+            cl = c.lower()
+            if cl == "sku": col_map[c] = "SKU"
+            elif cl == "product_name": col_map[c] = "Product Name"
+            elif cl == "reference_sku": col_map[c] = "Reference SKU"
+            elif cl == "default_msrp": col_map[c] = "Default MSRP"
+            elif cl == "default_fob": col_map[c] = "Default FOB"
+            elif cl == "default_tariff_rate": col_map[c] = "Default Tariff Rate"
+        return df.rename(columns=col_map)
+    except Exception:
+        return pd.DataFrame()
 
 def _load_sku_mapping_from_db():
     """Load SKU mapping from Azure SQL."""

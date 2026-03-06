@@ -52,7 +52,11 @@ except Exception as e:
 
 def load_table(table_name: str) -> pd.DataFrame:
     """Load a table from Azure SQL."""
-    return pd.read_sql(f"SELECT * FROM {table_name} ORDER BY id", engine)
+    try:
+        return pd.read_sql(f"SELECT * FROM {table_name} ORDER BY id", engine)
+    except Exception as e:
+        st.error(f"Failed to load {table_name}: {e}")
+        return pd.DataFrame()
 
 
 # =====================================================

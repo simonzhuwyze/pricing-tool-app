@@ -14,7 +14,7 @@ from core.data_loader import CHANNELS
 from core.cpam_engine import (
     UserInputs, calculate_channel_cpam, calculate_weighted_cpam,
 )
-from core.assumption_resolver import resolve_all_assumptions, clear_cache
+from core.assumption_resolver import resolve_all_assumptions
 from core.ui_helpers import styled_header, styled_divider, styled_metric_cards, styled_segmented
 
 
@@ -24,20 +24,25 @@ from core.ui_helpers import styled_header, styled_divider, styled_metric_cards, 
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=300)
 def _load_products():
-    from core.database import get_sqlalchemy_engine
-    engine = get_sqlalchemy_engine()
-    df = pd.read_sql_table("cache_product_directory", engine)
-    # Normalize column names for compatibility
-    col_map = {}
-    for c in df.columns:
-        cl = c.lower()
-        if cl == "sku": col_map[c] = "SKU"
-        elif cl == "product_name": col_map[c] = "Product Name"
-        elif cl == "reference_sku": col_map[c] = "Reference SKU"
-        elif cl == "default_msrp": col_map[c] = "Default MSRP"
-        elif cl == "default_fob": col_map[c] = "Default FOB"
-        elif cl == "default_tariff_rate": col_map[c] = "Default Tariff Rate"
-    return df.rename(columns=col_map)
+    try:
+        from core.database import get_sqlalchemy_engine
+        engine = get_sqlalchemy_engine()
+        df = pd.read_sql_table("cache_product_directory", engine)
+        # Normalize column names for compatibility
+        col_map = {}
+        for c in df.columns:
+            cl = c.lower()
+            if cl == "sku": col_map[c] = "SKU"
+            elif cl == "product_name": col_map[c] = "Product Name"
+            elif cl == "reference_sku": col_map[c] = "Reference SKU"
+            elif cl == "default_msrp": col_map[c] = "Default MSRP"
+            elif cl == "default_fob": col_map[c] = "Default FOB"
+            elif cl == "default_tariff_rate": col_map[c] = "Default Tariff Rate"
+        return df.rename(columns=col_map)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to load products: {e}")
+        return pd.DataFrame()
 
 
 products_df = _load_products()
@@ -105,7 +110,6 @@ with col_info3:
 if (st.session_state.resolved_assumptions is None or
         st.session_state.resolved_assumptions.sku != selected_sku):
     with st.spinner(f"Loading assumptions for {selected_sku}..."):
-        clear_cache()
         resolved = resolve_all_assumptions(selected_sku)
         st.session_state.resolved_assumptions = resolved
 

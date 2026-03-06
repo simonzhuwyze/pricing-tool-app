@@ -51,10 +51,31 @@ class ResolvedAssumptions:
 # Cache management (Streamlit-safe)
 # ---------------------------------------------------------------------------
 def clear_cache():
-    """Clear Streamlit data caches (call after CSV sync or data change)."""
+    """
+    Clear page-level data caches after CSV sync or data change.
+    Only clears specific known cached functions — NOT st.cache_data.clear()
+    which is a nuclear option that destroys all page caches and causes instability.
+    """
     try:
+        import importlib
         import streamlit as st
-        st.cache_data.clear()
+
+        # Clear pricing_tool_main._load_products
+        try:
+            mod = importlib.import_module("pages.pricing_tool_main")
+            if hasattr(mod, "_load_products") and hasattr(mod._load_products, "clear"):
+                mod._load_products.clear()
+        except Exception:
+            pass
+
+        # Clear pricing_tool_channel_mix._load_hierarchy
+        try:
+            mod = importlib.import_module("pages.pricing_tool_channel_mix")
+            if hasattr(mod, "_load_hierarchy") and hasattr(mod._load_hierarchy, "clear"):
+                mod._load_hierarchy.clear()
+        except Exception:
+            pass
+
     except Exception:
         pass
 

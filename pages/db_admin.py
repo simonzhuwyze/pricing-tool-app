@@ -201,6 +201,9 @@ if st.button("Sync CSV → Azure SQL"):
     with st.spinner("Syncing data... This may take a minute."):
         try:
             result = sync_csv_to_cache()
+            # Clear page-level caches so they pick up new data
+            from core.assumption_resolver import clear_cache
+            clear_cache()
             st.success("Data synced successfully!")
             for table, count in result.items():
                 st.write(f"  - **{table}**: {count} rows")
