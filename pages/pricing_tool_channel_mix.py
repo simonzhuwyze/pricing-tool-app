@@ -70,27 +70,24 @@ def _normalize_hierarchy(df):
 
 @st.cache_data(ttl=300)
 def _load_hierarchy():
-    """Load the full Product Group -> Category -> Line hierarchy."""
-    # Try DB first
-    try:
-        from core.database import get_sqlalchemy_engine
-        engine = get_sqlalchemy_engine()
-        df = pd.read_sql_table("cache_sku_mapping", engine)
-        cols_lower = [c.lower() for c in df.columns]
-        if "product_category" not in cols_lower:
-            df = None
-        elif not df.empty:
-            result = _normalize_hierarchy(df)
-            if not result.empty:
-                return result
-    except Exception:
-        pass
-
-    # No CSV fallback — DB is the single source of truth
-    return pd.DataFrame(columns=["Product_Group", "Product_Category", "Product_Line"])
+    """Load the full Product Group -> Category -> Line hierarchy.
+    Raises on failure so Streamlit does NOT cache error results."""
+    from core.database import get_sqlalchemy_engine
+    engine = get_sqlalchemy_engine()
+    df = pd.read_sql_table("cache_sku_mapping", engine)
+    cols_lower = [c.lower() for c in df.columns]
+    if "product_category" not in cols_lower or df.empty:
+        raise ValueError("SKU mapping data is empty or missing product_category column")
+    result = _normalize_hierarchy(df)
+    if result.empty:
+        raise ValueError("SKU mapping hierarchy is empty after normalization")
+    return result
 
 
-hierarchy_df = _load_hierarchy()
+try:
+    hierarchy_df = _load_hierarchy()
+except Exception:
+    hierarchy_df = pd.DataFrame(columns=["Product_Group", "Product_Category", "Product_Line"])
 
 # Refresh button if hierarchy is empty
 if hierarchy_df.empty:

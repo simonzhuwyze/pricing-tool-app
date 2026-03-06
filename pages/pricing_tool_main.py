@@ -24,28 +24,30 @@ from core.ui_helpers import styled_header, styled_divider, styled_metric_cards, 
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=300)
 def _load_products():
-    try:
-        from core.database import get_sqlalchemy_engine
-        engine = get_sqlalchemy_engine()
-        df = pd.read_sql_table("cache_product_directory", engine)
-        # Normalize column names for compatibility
-        col_map = {}
-        for c in df.columns:
-            cl = c.lower()
-            if cl == "sku": col_map[c] = "SKU"
-            elif cl == "product_name": col_map[c] = "Product Name"
-            elif cl == "reference_sku": col_map[c] = "Reference SKU"
-            elif cl == "default_msrp": col_map[c] = "Default MSRP"
-            elif cl == "default_fob": col_map[c] = "Default FOB"
-            elif cl == "default_tariff_rate": col_map[c] = "Default Tariff Rate"
-        return df.rename(columns=col_map)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to load products: {e}")
-        return pd.DataFrame()
+    """Load products from Azure SQL. Raises on failure so errors are NOT cached."""
+    from core.database import get_sqlalchemy_engine
+    engine = get_sqlalchemy_engine()
+    df = pd.read_sql_table("cache_product_directory", engine)
+    # Normalize column names for compatibility
+    col_map = {}
+    for c in df.columns:
+        cl = c.lower()
+        if cl == "sku": col_map[c] = "SKU"
+        elif cl == "product_name": col_map[c] = "Product Name"
+        elif cl == "reference_sku": col_map[c] = "Reference SKU"
+        elif cl == "default_msrp": col_map[c] = "Default MSRP"
+        elif cl == "default_fob": col_map[c] = "Default FOB"
+        elif cl == "default_tariff_rate": col_map[c] = "Default Tariff Rate"
+    return df.rename(columns=col_map)
 
 
-products_df = _load_products()
+# Catch outside — if _load_products raises, Streamlit does NOT cache the error,
+# so next page load will retry automatically.
+try:
+    products_df = _load_products()
+except Exception as e:
+    products_df = pd.DataFrame()
+    st.warning(f"Failed to load products from database: {e}")
 
 # ---------------------------------------------------------------------------
 # Title
@@ -58,7 +60,7 @@ styled_header("Pricing Tool", "Select a product, configure inputs, and calculate
 st.subheader("1. Select Product")
 
 if products_df.empty:
-    st.error("No products found. Check data/reference data/Product Directory.csv")
+    st.error("No products found. Go to **DB Admin** to check connection and run **CSV Sync**.")
     st.stop()
 
 # Build display options: "SKU - Product Name"
