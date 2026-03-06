@@ -85,7 +85,7 @@ pt_assumptions = st.Page(
 )
 pt_export = st.Page(
     "pages/pricing_tool_export.py",
-    title="Export Report",
+    title="Export & Save",
     icon="📄",
 )
 
@@ -158,7 +158,7 @@ user_mgmt = st.Page(
 # --- Navigation (role-based filtering) ---
 nav_pages = {
     "Product Directory": [product_directory],
-    "Pricing Tool": [pt_main, pt_cpam, pt_channel_mix, pt_sensitivity, pt_assumptions, pt_export],
+    "Pricing Tool": [pt_main, pt_channel_mix, pt_cpam, pt_sensitivity, pt_assumptions, pt_export],
     "Reference": [templates, formula_ref, user_guide],
 }
 

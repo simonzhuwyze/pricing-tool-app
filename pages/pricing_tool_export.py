@@ -1,6 +1,6 @@
 """
-Export Report - Generate PDF pricing analysis report.
-Select sections to include, then download as PDF.
+Export & Save - Generate PDF pricing analysis report and save pricing templates.
+Select sections to include, then download as PDF. Save current session as a reusable template.
 """
 
 import streamlit as st
@@ -16,8 +16,9 @@ from core.cpam_engine import (
     UserInputs, calculate_channel_cpam, calculate_weighted_cpam,
 )
 from core.assumption_resolver import resolution_log_to_df
-from core.ui_helpers import styled_header, styled_segmented
+from core.ui_helpers import styled_header, styled_divider, styled_segmented
 from core.pdf_export import ExportConfig, generate_pricing_report
+from core.template_manager import save_template
 
 
 # =========================================================================
@@ -386,7 +387,7 @@ def build_export_config(
 # =========================================================================
 # Streamlit UI
 # =========================================================================
-styled_header("Export Report", "Generate a PDF report of your pricing analysis.")
+styled_header("Export & Save", "Generate a PDF report or save your current session as a reusable template.")
 
 # --- Prerequisites ---
 selected_sku = st.session_state.get("selected_sku")
@@ -454,3 +455,62 @@ if "export_pdf_bytes" in st.session_state:
         type="primary",
         use_container_width=True,
     )
+
+# =========================================================================
+# 4. Save to Template
+# =========================================================================
+styled_divider(label="Save to Template", icon="bookmark-fill")
+st.caption(
+    "Save the current pricing session (SKU, inputs, channel mix, assumptions) "
+    "as a reusable template. Load it later from **Pricing Templates**."
+)
+
+ui = st.session_state.get("user_inputs", {})
+mix = st.session_state.get("channel_mix", {})
+active_mix = {ch: pct for ch, pct in mix.items() if pct > 0}
+
+# Preview what will be saved
+col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+with col_s1:
+    st.metric("MSRP", f"${ui.get('msrp', 0):.2f}")
+with col_s2:
+    st.metric("FOB", f"${ui.get('fob', 0):.2f}")
+with col_s3:
+    st.metric("Tariff", f"{ui.get('tariff_rate', 0):.1f}%")
+with col_s4:
+    st.metric("Active Channels", len(active_mix))
+
+if active_mix:
+    st.caption("Channel Mix: " + ", ".join(f"{ch} ({pct:.0f}%)" for ch, pct in active_mix.items()))
+
+template_name = st.text_input(
+    "Template Name",
+    value=f"{selected_sku} - Pricing",
+    help="Give this template a descriptive name",
+    key="export_template_name",
+)
+notes = st.text_area(
+    "Notes (optional)",
+    height=80,
+    placeholder="e.g. Q1 2026 pricing review",
+    key="export_template_notes",
+)
+user = st.session_state.get("current_user", "local_user")
+
+if st.button("Save Template", type="primary", key="export_save_template"):
+    if template_name:
+        try:
+            tid = save_template(
+                sku=selected_sku,
+                template_name=template_name,
+                user=user,
+                user_inputs=ui,
+                channel_mix=mix,
+                resolved_assumptions=resolved,
+                notes=notes,
+            )
+            st.success(f"Template saved! (ID: {tid})")
+        except Exception as e:
+            st.error(f"Save failed: {e}")
+    else:
+        st.warning("Please enter a template name.")

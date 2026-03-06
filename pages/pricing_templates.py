@@ -38,7 +38,7 @@ except Exception as e:
     st.stop()
 
 from core.template_manager import (
-    list_templates, save_template, load_template_to_session,
+    list_templates, load_template_to_session,
     delete_template, get_template_by_id,
 )
 
@@ -49,79 +49,15 @@ from core.ui_helpers import styled_tabs
 import streamlit_antd_components as sac
 
 active_tab = styled_tabs(
-    ["Save Current", "Browse Templates", "Load Template"],
-    icons=["save", "folder2-open", "download"],
+    ["Browse Templates", "Load Template"],
+    icons=["folder2-open", "download"],
     key="tmpl_tabs",
 )
 
 # ---------------------------------------------------------------------------
-# Tab 1: Save Current Session
+# Tab 1: Browse Templates
 # ---------------------------------------------------------------------------
-if active_tab == "Save Current":
-    st.subheader("Save Current Session as Template")
-
-    selected_sku = st.session_state.get("selected_sku")
-    resolved = st.session_state.get("resolved_assumptions")
-
-    if not selected_sku or resolved is None:
-        st.warning("No active pricing session. Go to **Pricing Tool** to select a product first.")
-        st.page_link("pages/pricing_tool_main.py", label="Go to Pricing Tool ->")
-    else:
-        st.success(f"Current session: **{selected_sku}** - {resolved.product_info.product_name}")
-
-        ui = st.session_state.get("user_inputs", {})
-        mix = st.session_state.get("channel_mix", {})
-
-        # Show what will be saved
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("MSRP", f"${ui.get('msrp', 0):.2f}")
-        with col2:
-            st.metric("FOB", f"${ui.get('fob', 0):.2f}")
-        with col3:
-            st.metric("Tariff", f"{ui.get('tariff_rate', 0):.1f}%")
-        with col4:
-            active_mix = {ch: pct for ch, pct in mix.items() if pct > 0}
-            st.metric("Active Channels", len(active_mix))
-
-        # Active channel mix summary
-        if active_mix:
-            st.caption("Channel Mix: " + ", ".join(f"{ch} ({pct:.0f}%)" for ch, pct in active_mix.items()))
-
-        st.divider()
-
-        # Save form
-        template_name = st.text_input(
-            "Template Name",
-            value=f"{selected_sku} - Pricing",
-            help="Give this template a descriptive name",
-        )
-        notes = st.text_area("Notes (optional)", height=80, placeholder="e.g. Q1 2026 pricing review")
-        user = st.session_state.get("current_user", "local_user")
-
-        if st.button("Save Template", type="primary"):
-            if template_name:
-                try:
-                    tid = save_template(
-                        sku=selected_sku,
-                        template_name=template_name,
-                        user=user,
-                        user_inputs=ui,
-                        channel_mix=mix,
-                        resolved_assumptions=resolved,
-                        notes=notes,
-                    )
-                    st.success(f"Template saved! (ID: {tid})")
-                except Exception as e:
-                    st.error(f"Save failed: {e}")
-            else:
-                st.warning("Please enter a template name.")
-
-
-# ---------------------------------------------------------------------------
-# Tab 2: Browse Templates
-# ---------------------------------------------------------------------------
-elif active_tab == "Browse Templates":
+if active_tab == "Browse Templates":
     st.subheader("All Templates")
 
     col_f1, col_f2 = st.columns(2)
@@ -136,7 +72,7 @@ elif active_tab == "Browse Templates":
     )
 
     if templates_df.empty:
-        st.info("No templates found. Save your first template in the 'Save Current' tab.")
+        st.info("No templates found. Save your first template from the **Export & Save** page.")
     else:
         # Format for display
         display_cols = []
@@ -204,7 +140,7 @@ elif active_tab == "Browse Templates":
 
 
 # ---------------------------------------------------------------------------
-# Tab 3: Load Template into Session
+# Tab 2: Load Template into Session
 # ---------------------------------------------------------------------------
 elif active_tab == "Load Template":
     st.subheader("Load a Template")
