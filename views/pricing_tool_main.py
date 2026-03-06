@@ -41,6 +41,11 @@ def _load_products():
     return df.rename(columns=col_map)
 
 
+# Auto-refresh if a new SKU was created on Product Directory page
+if st.session_state.get("_refresh_products"):
+    _load_products.clear()
+    del st.session_state["_refresh_products"]
+
 # Catch outside — if _load_products raises, Streamlit does NOT cache the error,
 # so next page load will retry automatically.
 try:
@@ -52,7 +57,14 @@ except Exception as e:
 # ---------------------------------------------------------------------------
 # Title
 # ---------------------------------------------------------------------------
-styled_header("Pricing Tool", "Select a product, configure inputs, and calculate CPAM across all channels.")
+_header_col, _refresh_col = st.columns([9, 1])
+with _header_col:
+    styled_header("Pricing Tool", "Select a product, configure inputs, and calculate CPAM across all channels.")
+with _refresh_col:
+    st.write("")  # spacing
+    if st.button("🔄", help="Refresh product list from database", key="btn_refresh_products"):
+        _load_products.clear()
+        st.rerun()
 
 # ---------------------------------------------------------------------------
 # 1. Product Selection

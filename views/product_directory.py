@@ -353,6 +353,8 @@ else:
                         clear_cache()
                     except Exception:
                         pass
+                    # Signal Pricing Tool to refresh product cache on next load
+                    st.session_state["_refresh_products"] = True
                     st.success(f"SKU **{new_sku.strip()}** created successfully! Refresh the page to see it in the table.")
                     st.json(result)
                 except Exception as e:
