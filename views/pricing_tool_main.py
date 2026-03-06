@@ -118,6 +118,63 @@ with col_info3:
     st.metric("Type", "Existing" if str(preload) == "1" else "New Product")
 
 # ---------------------------------------------------------------------------
+# 1b. Load from Template (optional)
+# ---------------------------------------------------------------------------
+try:
+    from core.template_manager import list_templates, load_template_to_session
+    _tmpl_df = list_templates(sku=selected_sku)
+except Exception:
+    _tmpl_df = pd.DataFrame()
+
+if not _tmpl_df.empty:
+    with st.expander(f"Load from Template ({len(_tmpl_df)} saved)", expanded=False):
+        # Build selectbox options
+        _tmpl_options = [""] + [
+            f"{row.get('template_name', '')}  |  MSRP ${row.get('msrp', 0):.2f}  FOB ${row.get('fob', 0):.2f}  |  {str(row.get('updated_at', ''))[:10]}"
+            for _, row in _tmpl_df.iterrows()
+        ]
+        _tmpl_ids = [None] + _tmpl_df["id"].tolist()
+
+        _tmpl_sel = st.selectbox(
+            "Select a template",
+            range(len(_tmpl_options)),
+            format_func=lambda i: _tmpl_options[i] if _tmpl_options[i] else "Choose a template...",
+            key="main_tmpl_select",
+        )
+
+        if _tmpl_sel and _tmpl_sel > 0:
+            _sel_row = _tmpl_df.iloc[_tmpl_sel - 1]
+            # Preview
+            _pc1, _pc2, _pc3, _pc4 = st.columns(4)
+            with _pc1:
+                st.caption(f"MSRP: **${_sel_row.get('msrp', 0):.2f}**")
+            with _pc2:
+                st.caption(f"FOB: **${_sel_row.get('fob', 0):.2f}**")
+            with _pc3:
+                st.caption(f"Tariff: **{_sel_row.get('tariff_rate', 0):.1f}%**")
+            with _pc4:
+                st.caption(f"Promo Mix: **{_sel_row.get('promotion_mix', 0):.0f}%**")
+            if _sel_row.get("notes"):
+                st.caption(f"Notes: {_sel_row['notes']}")
+
+            if st.button("Load Template", type="primary", key="btn_load_tmpl"):
+                _tid = int(_tmpl_ids[_tmpl_sel])
+                _session_data = load_template_to_session(_tid)
+                if _session_data:
+                    from core.data_loader import CHANNELS as _CH
+                    st.session_state.selected_sku = _session_data["sku"]
+                    st.session_state.user_inputs = _session_data["user_inputs"]
+                    _new_mix = {ch: 0.0 for ch in _CH}
+                    for ch, pct in _session_data["channel_mix"].items():
+                        if ch in _new_mix:
+                            _new_mix[ch] = pct
+                    st.session_state.channel_mix = _new_mix
+                    st.session_state.resolved_assumptions = None
+                    st.rerun()
+                else:
+                    st.error("Failed to load template.")
+
+# ---------------------------------------------------------------------------
 # 2. Resolve Assumptions
 # ---------------------------------------------------------------------------
 # Auto-resolve when SKU changes

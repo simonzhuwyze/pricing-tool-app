@@ -158,9 +158,9 @@ user_mgmt = st.Page(
 # --- Navigation (role-based filtering) ---
 try:
     nav_pages = {
-        "Product Directory": [product_directory],
+        "Product Directory": [product_directory, templates],
         "Pricing Tool": [pt_main, pt_channel_mix, pt_cpam, pt_sensitivity, pt_assumptions, pt_export],
-        "Reference": [templates, formula_ref, user_guide],
+        "Reference": [formula_ref, user_guide],
     }
 
     if has_permission("edit_assumptions"):
@@ -183,7 +183,8 @@ except Exception as e:
     logging.getLogger(__name__).error(f"Navigation setup error: {e}")
     pg = st.navigation({
         "Pricing Tool": [pt_main, pt_channel_mix, pt_cpam, pt_sensitivity, pt_assumptions, pt_export],
-        "Reference": [templates, formula_ref, user_guide],
+        "Product Directory": [product_directory, templates],
+        "Reference": [formula_ref, user_guide],
     })
 
 # Show user info in sidebar (only when auth is enabled)
