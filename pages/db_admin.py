@@ -209,18 +209,30 @@ if st.button("Sync CSV → Azure SQL"):
 
 # --- Snowflake Sync ---
 styled_divider(label="4. Snowflake Sync", icon="snow2")
-st.markdown(
-    "Connect to Snowflake via SSO and pull live data into Azure SQL cache. "
-    "This will open a browser window for Okta authentication."
-)
+
+# Detect headless server (Azure App Service) — externalbrowser SSO won't work
+_is_server = os.environ.get("WEBSITE_SITE_NAME") or os.environ.get("WEBSITES_PORT")
+
+if _is_server:
+    st.info(
+        "⚠️ Snowflake Sync is **not available** on Azure App Service "
+        "(SSO requires a browser window).\n\n"
+        "To sync Snowflake data, run locally:\n"
+        "```\npython run_sync.py\n```"
+    )
+else:
+    st.markdown(
+        "Connect to Snowflake via SSO and pull live data into Azure SQL cache. "
+        "This will open a browser window for Okta authentication."
+    )
 
 # Snowflake config
 sf_account = os.environ.get("SNOWFLAKE_ACCOUNT", "")
 sf_user = os.environ.get("SNOWFLAKE_USER", "")
 
-if sf_account:
+if sf_account and not _is_server:
     st.success(f"Snowflake config: **{sf_account}** / {sf_user}")
-else:
+elif not _is_server and not sf_account:
     st.warning("Snowflake not configured yet.")
     with st.expander("Configure Snowflake"):
         sf_account_input = st.text_input("Snowflake Account", placeholder="e.g. xy12345.us-west-2")
@@ -258,45 +270,46 @@ else:
             st.success("Snowflake config saved!")
             st.rerun()
 
-col_sf_test, col_sf_sync = st.columns(2)
-with col_sf_test:
-    if st.button("Test Snowflake Connection"):
-        from core.snowflake_sync import test_snowflake_connection
-        with st.spinner("Connecting via SSO (check your browser)..."):
-            result = test_snowflake_connection()
-        if result["status"] == "connected":
-            st.success(f"Connected! User: **{result['user']}** | DB: {result['database']}")
-        else:
-            st.error(f"Failed: {result['message']}")
+if not _is_server:
+    col_sf_test, col_sf_sync = st.columns(2)
+    with col_sf_test:
+        if st.button("Test Snowflake Connection"):
+            from core.snowflake_sync import test_snowflake_connection
+            with st.spinner("Connecting via SSO (check your browser)..."):
+                result = test_snowflake_connection()
+            if result["status"] == "connected":
+                st.success(f"Connected! User: **{result['user']}** | DB: {result['database']}")
+            else:
+                st.error(f"Failed: {result['message']}")
 
-with col_sf_sync:
-    if st.button("Sync Snowflake → Azure SQL"):
-        from core.snowflake_sync import sync_all
-        with st.spinner("Syncing from Snowflake (check browser for SSO)..."):
-            try:
-                result = sync_all()
-                st.success("Snowflake sync completed!")
-                for table, count in result.items():
-                    if isinstance(count, int):
-                        st.write(f"  - **{table}**: {count} rows")
-                    else:
-                        st.warning(f"  - **{table}**: {count}")
-            except Exception as e:
-                st.error(f"Sync failed: {e}")
-
-# Custom Snowflake query
-with st.expander("Run Custom Snowflake Query"):
-    custom_query = st.text_area("SQL Query", height=100, placeholder="SELECT * FROM your_table LIMIT 10")
-    if st.button("Run Query", key="run_sf_query"):
-        if custom_query:
-            from core.snowflake_sync import run_custom_query
-            with st.spinner("Running query..."):
+    with col_sf_sync:
+        if st.button("Sync Snowflake → Azure SQL"):
+            from core.snowflake_sync import sync_all
+            with st.spinner("Syncing from Snowflake (check browser for SSO)..."):
                 try:
-                    result_df = run_custom_query(custom_query)
-                    st.dataframe(result_df, use_container_width=True, hide_index=True)
-                    st.caption(f"{len(result_df)} rows returned")
+                    result = sync_all()
+                    st.success("Snowflake sync completed!")
+                    for table, count in result.items():
+                        if isinstance(count, int):
+                            st.write(f"  - **{table}**: {count} rows")
+                        else:
+                            st.warning(f"  - **{table}**: {count}")
                 except Exception as e:
-                    st.error(f"Query failed: {e}")
+                    st.error(f"Sync failed: {e}")
+
+    # Custom Snowflake query
+    with st.expander("Run Custom Snowflake Query"):
+        custom_query = st.text_area("SQL Query", height=100, placeholder="SELECT * FROM your_table LIMIT 10")
+        if st.button("Run Query", key="run_sf_query"):
+            if custom_query:
+                from core.snowflake_sync import run_custom_query
+                with st.spinner("Running query..."):
+                    try:
+                        result_df = run_custom_query(custom_query)
+                        st.dataframe(result_df, use_container_width=True, hide_index=True)
+                        st.caption(f"{len(result_df)} rows returned")
+                    except Exception as e:
+                        st.error(f"Query failed: {e}")
 
 # --- Database Status ---
 styled_divider(label="5. Database Status", icon="activity")
