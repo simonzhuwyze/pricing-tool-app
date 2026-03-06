@@ -353,9 +353,7 @@ else:
                         clear_cache()
                     except Exception:
                         pass
-                    st.success(f"SKU **{new_sku.strip()}** created successfully!")
+                    st.success(f"SKU **{new_sku.strip()}** created successfully! Refresh the page to see it in the table.")
                     st.json(result)
-                    st.balloons()
-                    st.rerun()
                 except Exception as e:
                     st.error(f"Failed to create SKU: {e}")
