@@ -257,6 +257,7 @@ def build_shipping_comparison(skus: list) -> pd.DataFrame:
 
             # 1. Direct match
             sf_val = sf_dict.get((sku, channel))
+            match_type = None
             if sf_val is not None:
                 match_type = "direct"
             else:
@@ -268,7 +269,17 @@ def build_shipping_comparison(skus: list) -> pd.DataFrame:
                         match_type = f"via ref: {ref_sku}"
 
             if sf_val is None:
-                continue  # no SF data for this SKU+channel
+                # Include unmatched rows so users can see what has no SF data
+                rows.append({
+                    "sku": sku,
+                    "channel": channel,
+                    "product_line": pl,
+                    "cache_value": cache_val,
+                    "sf_value": None,
+                    "diff": None,
+                    "match_type": "no SF match",
+                })
+                continue
 
             diff = round(cache_val - sf_val, 4)
             rows.append({
@@ -283,8 +294,13 @@ def build_shipping_comparison(skus: list) -> pd.DataFrame:
 
         result = pd.DataFrame(rows)
         if not result.empty:
-            result["abs_diff"] = result["diff"].abs()
-            result = result.sort_values("abs_diff", ascending=False).drop(columns=["abs_diff"])
+            # Sort: unmatched (NaN diff) last, then by abs diff descending
+            matched = result[result["diff"].notna()].copy()
+            unmatched = result[result["diff"].isna()].copy()
+            if not matched.empty:
+                matched["abs_diff"] = matched["diff"].abs()
+                matched = matched.sort_values("abs_diff", ascending=False).drop(columns=["abs_diff"])
+            result = pd.concat([matched, unmatched], ignore_index=True)
         return result
 
     except Exception as e:
@@ -681,28 +697,110 @@ elif active_tab == "Outbound Shipping":
             comparison = build_shipping_comparison(selected_ship_skus)
         st.session_state["ship_comparison_full"] = comparison
 
-        # Show match stats
-        if not comparison.empty and "match_type" in comparison.columns:
-            n_direct = len(comparison[comparison["match_type"] == "direct"])
-            n_ref = len(comparison[comparison["match_type"].str.startswith("via ref")])
-            st.info(
-                f"Matched **{len(comparison)}** cache SKU+channel rows to SF: "
-                f"**{n_direct}** direct match, **{n_ref}** via reference SKU"
-            )
+    # Render results if comparison exists
+    if "ship_comparison_full" in st.session_state:
+        comparison = st.session_state["ship_comparison_full"]
 
-    # Render batch UI if comparison exists
-    if "ship_comparison_full" in st.session_state and not st.session_state["ship_comparison_full"].empty:
-        _render_batch_ui(
-            comparison_df=st.session_state["ship_comparison_full"],
-            field_name="outbound_shipping",
-            tab_key="ship",
-            value_fmt="dollar",
-        )
-    elif "ship_comparison_full" in st.session_state:
-        if has_sf_snap:
-            st.success("No shipping data to compare (try different SKU filter).")
+        if comparison.empty:
+            if has_sf_snap:
+                st.success("No shipping data to compare (try different SKU filter).")
+            else:
+                st.info("Run Snowflake Sync first to pull shipping data.")
         else:
-            st.info("Run Snowflake Sync first to pull shipping data.")
+            # Split into matched (has SF data) vs unmatched (no SF match)
+            matched_df = comparison[comparison["match_type"] != "no SF match"].copy()
+            unmatched_df = comparison[comparison["match_type"] == "no SF match"].copy()
+
+            n_total = len(comparison)
+            n_matched = len(matched_df)
+            n_unmatched = len(unmatched_df)
+            n_direct = len(matched_df[matched_df["match_type"] == "direct"]) if not matched_df.empty else 0
+            n_ref = len(matched_df[matched_df["match_type"].str.startswith("via ref", na=False)]) if not matched_df.empty else 0
+
+            # Summary metrics
+            col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+            with col_s1:
+                st.metric("Total Cache Rows", n_total)
+            with col_s2:
+                st.metric("Matched to SF", n_matched)
+            with col_s3:
+                st.metric("Direct Match", n_direct)
+            with col_s4:
+                st.metric("No SF Match", n_unmatched, delta=f"-{n_unmatched}" if n_unmatched > 0 else None,
+                          delta_color="inverse" if n_unmatched > 0 else "off")
+
+            if n_ref > 0:
+                st.info(f"**{n_ref}** rows matched via Reference SKU fallback")
+
+            if n_unmatched > 0:
+                st.warning(
+                    f"**{n_unmatched}** cache rows have **no matching SF data**. "
+                    f"These SKUs could not be found in `cache_outbound_shipping_sf` "
+                    f"(neither by direct SKU nor by reference_sku). "
+                    f"Check if Snowflake sync pulled data for these SKUs, or if reference_sku mapping is correct."
+                )
+
+            # Render matched rows through batch UI
+            if not matched_df.empty:
+                styled_divider(label="Matched Rows (Cache vs SF)", icon="check-circle-fill")
+                _render_batch_ui(
+                    comparison_df=matched_df,
+                    field_name="outbound_shipping",
+                    tab_key="ship",
+                    value_fmt="dollar",
+                )
+
+            # Show unmatched rows
+            if not unmatched_df.empty:
+                styled_divider(label=f"Unmatched Rows ({n_unmatched})", icon="exclamation-triangle-fill")
+                st.caption(
+                    "These cache SKU+channel combinations have no matching Snowflake data. "
+                    "Possible causes: SKU not in Snowflake, reference_sku not set or doesn't match SF SKU."
+                )
+
+                # Per-channel breakdown
+                ch_counts = unmatched_df.groupby("channel").size().reset_index(name="count")
+                for _, ch_row in ch_counts.iterrows():
+                    st.write(f"- **{ch_row['channel']}**: {ch_row['count']} unmatched SKUs")
+
+                with st.expander("View Unmatched SKUs", expanded=False):
+                    display_unmatched = unmatched_df[["sku", "channel", "product_line", "cache_value"]].copy()
+                    display_unmatched = display_unmatched.rename(columns={"cache_value": "Cache Value ($)"})
+                    st.dataframe(display_unmatched, use_container_width=True, hide_index=True)
+
+            # SF Raw Data Preview
+            if has_sf_snap:
+                styled_divider(label="SF Snapshot Preview", icon="database-fill")
+                with st.expander("View raw Snowflake shipping data (cache_outbound_shipping_sf)", expanded=False):
+                    try:
+                        sf_raw = pd.read_sql(
+                            "SELECT sku, channel, outbound_shipping_cost FROM cache_outbound_shipping_sf ORDER BY channel, sku",
+                            engine,
+                        )
+                        # Per-channel counts
+                        ch_summary = sf_raw.groupby("channel").agg(
+                            SKUs=("sku", "nunique"),
+                            Rows=("sku", "count"),
+                        ).reset_index()
+                        st.write("**SF Data by Channel:**")
+                        st.dataframe(ch_summary, use_container_width=True, hide_index=True)
+
+                        # Filter by channel
+                        sf_ch_filter = st.multiselect(
+                            "Filter SF data by channel",
+                            sorted(sf_raw["channel"].unique().tolist()),
+                            key="sf_raw_ship_ch_filter",
+                        )
+                        if sf_ch_filter:
+                            sf_raw = sf_raw[sf_raw["channel"].isin(sf_ch_filter)]
+
+                        st.dataframe(
+                            sf_raw.style.format({"outbound_shipping_cost": "${:.2f}"}, na_rep="-"),
+                            use_container_width=True, hide_index=True, height=400,
+                        )
+                        st.caption(f"{len(sf_raw)} rows in SF snapshot")
+                    except Exception as e:
+                        st.error(f"Failed to load SF snapshot: {e}")
 
 # ===========================================================================
 # Tab 3: Validation History
