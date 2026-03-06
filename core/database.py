@@ -123,18 +123,29 @@ def get_sqlalchemy_engine():
 
 def _create_engine_instance():
     """Create a new SQLAlchemy engine instance."""
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, event
     from urllib.parse import quote_plus
 
     conn_str = _load_connection_string()
     if not conn_str:
         raise ConnectionError("Azure SQL connection string not found.")
 
-    return create_engine(
+    engine = create_engine(
         f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}",
         pool_pre_ping=True,
         pool_recycle=300,
+        pool_reset_on_return="rollback",
     )
+
+    # Auto-rollback on connection checkout to prevent PendingRollbackError
+    @event.listens_for(engine, "checkout")
+    def _on_checkout(dbapi_conn, connection_record, connection_proxy):
+        try:
+            dbapi_conn.rollback()
+        except Exception:
+            pass
+
+    return engine
 
 
 try:
@@ -147,6 +158,16 @@ try:
 except ImportError:
     def _get_cached_engine():
         return _create_engine_instance()
+
+
+def reset_engine_pool():
+    """Dispose all pooled connections to recover from PendingRollbackError."""
+    try:
+        engine = get_sqlalchemy_engine()
+        engine.dispose()
+        logger.info("Engine pool disposed and reset.")
+    except Exception as e:
+        logger.warning(f"Engine pool reset failed: {e}")
 
 
 def test_connection() -> dict:

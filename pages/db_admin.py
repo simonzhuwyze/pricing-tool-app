@@ -140,32 +140,39 @@ with col_save:
         st.rerun()
 
 with col_test:
-    if st.button("Test Connection"):
-        from core.database import test_connection
-        with st.spinner("Connecting to Azure SQL..."):
-            result = test_connection()
-        if result["status"] == "connected":
-            st.success(f"Connected to **{result['database']}**")
-            st.caption(result["version"])
-        else:
-            st.error(f"Connection failed: {result['message']}")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Test Connection"):
+            from core.database import test_connection
+            with st.spinner("Connecting to Azure SQL..."):
+                result = test_connection()
+            if result["status"] == "connected":
+                st.success(f"Connected to **{result['database']}**")
+                st.caption(result["version"])
+            else:
+                st.error(f"Connection failed: {result['message']}")
 
-            # Common error hints
-            msg = result["message"].lower()
-            if "login failed" in msg:
-                st.warning("Check username/password in connection string")
-            elif "cannot open server" in msg or "tcp provider" in msg or "timeout" in msg:
-                st.warning(
-                    "Check:\n"
-                    "1. Server name is correct\n"
-                    "2. Firewall rule allows your IP (Azure Portal → SQL Server → Networking)\n"
-                    "3. Public network access is set to 'Selected networks' (not Disabled)"
-                )
-            elif "driver" in msg or "data source" in msg:
-                st.warning(
-                    "ODBC Driver issue. Make sure the Driver= field matches an installed driver.\n"
-                    "Your installed drivers: " + str(__import__("pyodbc").drivers())
-                )
+                # Common error hints
+                msg = result["message"].lower()
+                if "login failed" in msg:
+                    st.warning("Check username/password in connection string")
+                elif "cannot open server" in msg or "tcp provider" in msg or "timeout" in msg:
+                    st.warning(
+                        "Check:\n"
+                        "1. Server name is correct\n"
+                        "2. Firewall rule allows your IP (Azure Portal → SQL Server → Networking)\n"
+                        "3. Public network access is set to 'Selected networks' (not Disabled)"
+                    )
+                elif "driver" in msg or "data source" in msg:
+                    st.warning(
+                        "ODBC Driver issue. Make sure the Driver= field matches an installed driver.\n"
+                        "Your installed drivers: " + str(__import__("pyodbc").drivers())
+                    )
+    with c2:
+        if st.button("Reset Connection Pool", help="Fix PendingRollbackError or stale connections"):
+            from core.database import reset_engine_pool
+            reset_engine_pool()
+            st.success("Connection pool reset. All stale connections cleared.")
 
 # --- Schema Initialization ---
 styled_divider(label="2. Initialize Schema", icon="database-fill-gear")
