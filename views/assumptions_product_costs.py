@@ -118,22 +118,22 @@ else:
     with col1:
         new_inbound = st.number_input(
             "Inbound Freight ($)", value=current["Inbound_Freight"],
-            min_value=0.0, step=0.1, format="%.2f", key="pc_inbound",
+            min_value=0.0, max_value=999.0, step=0.1, format="%.2f", key="pc_inbound",
         )
     with col2:
         new_warehouse = st.number_input(
             "Warehouse Storage ($)", value=current["Warehouse_Storage"],
-            min_value=0.0, step=0.1, format="%.2f", key="pc_warehouse",
+            min_value=0.0, max_value=999.0, step=0.1, format="%.2f", key="pc_warehouse",
         )
     with col3:
         new_fba = st.number_input(
             "Amazon FBA ($)", value=current["Amazon_FBA"],
-            min_value=0.0, step=0.1, format="%.2f", key="pc_fba",
+            min_value=0.0, max_value=999.0, step=0.1, format="%.2f", key="pc_fba",
         )
     with col4:
         new_life = st.number_input(
             "Expected Life (months)", value=current["Expected_Product_Life"],
-            min_value=0.0, step=1.0, format="%.0f", key="pc_life",
+            min_value=0.0, max_value=120.0, step=1.0, format="%.0f", key="pc_life",
         )
 
     if st.button("Save Changes", key="pc_save"):

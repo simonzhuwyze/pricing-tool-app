@@ -104,7 +104,7 @@ else:
         new_val = st.number_input(
             "New Cost ($)",
             value=float(current_val),
-            min_value=0.0, step=0.1, format="%.2f",
+            min_value=0.0, max_value=999.0, step=0.1, format="%.2f",
             key="ob_new_val",
         )
 

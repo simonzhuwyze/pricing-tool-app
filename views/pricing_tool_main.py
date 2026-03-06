@@ -155,6 +155,7 @@ with col1:
     msrp = st.number_input(
         "MSRP ($)",
         min_value=0.0,
+        max_value=9999.0,
         value=float(st.session_state.user_inputs.get("msrp", 0)),
         step=1.0,
         format="%.2f",
@@ -166,6 +167,7 @@ with col2:
     fob = st.number_input(
         "FOB ($)",
         min_value=0.0,
+        max_value=9999.0,
         value=float(st.session_state.user_inputs.get("fob", 0)),
         step=1.0,
         format="%.2f",
@@ -189,6 +191,10 @@ with col3:
 if msrp == 0:
     st.warning("MSRP is $0.00. Enter a value to calculate CPAM.")
     st.stop()
+if fob > msrp > 0:
+    st.warning(f"FOB (${fob:.2f}) exceeds MSRP (${msrp:.2f}) — is this correct?")
+if fob == 0 and msrp > 0:
+    st.warning("FOB is $0.00 — landed cost will be zero.")
 
 # ---------------------------------------------------------------------------
 # 4. Promotion Settings
@@ -245,7 +251,8 @@ if promo_pct == 0 and promo_mix > 0:
                 new_promo_abs[ch] = st.number_input(
                     ch,
                     min_value=0.0,
-                    value=float(promo_abs.get(ch, 0.0)),
+                    max_value=max(msrp, 1.0),
+                    value=min(float(promo_abs.get(ch, 0.0)), msrp),
                     step=1.0,
                     format="%.2f",
                     key=f"promo_abs_{ch}",

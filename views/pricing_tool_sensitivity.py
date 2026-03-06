@@ -73,12 +73,14 @@ active_tab = styled_tabs(
 if active_tab == "MSRP Sensitivity":
     col1, col2 = st.columns(2)
     with col1:
-        msrp_step = st.number_input("Step ($)", value=5.0, step=1.0, key="msrp_step")
+        msrp_step = st.number_input("Step ($)", value=5.0, min_value=0.01, max_value=100.0, step=1.0, key="msrp_step")
     with col2:
         msrp_range = st.slider("Range (±steps)", 1, 10, 5, key="msrp_range")
 
     if base_msrp > 0:
-        sweep_values = [base_msrp + (i - msrp_range) * msrp_step for i in range(2 * msrp_range + 1)]
+        sweep_values = [v for v in
+                        (base_msrp + (i - msrp_range) * msrp_step for i in range(2 * msrp_range + 1))
+                        if v > 0]
         cpam_values = [compute_blended_cpam(m, base_fob) for m in sweep_values]
 
         colors = []
@@ -113,12 +115,14 @@ if active_tab == "MSRP Sensitivity":
 elif active_tab == "FOB Sensitivity":
     col1, col2 = st.columns(2)
     with col1:
-        fob_step = st.number_input("Step ($)", value=2.0, step=0.5, key="fob_step")
+        fob_step = st.number_input("Step ($)", value=2.0, min_value=0.01, max_value=100.0, step=0.5, key="fob_step")
     with col2:
         fob_range = st.slider("Range (±steps)", 1, 10, 5, key="fob_range")
 
     if base_fob > 0:
-        sweep_values = [base_fob + (i - fob_range) * fob_step for i in range(2 * fob_range + 1)]
+        sweep_values = [v for v in
+                        (base_fob + (i - fob_range) * fob_step for i in range(2 * fob_range + 1))
+                        if v > 0]
         cpam_values = [compute_blended_cpam(base_msrp, f) for f in sweep_values]
 
         colors = []

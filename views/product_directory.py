@@ -185,9 +185,9 @@ else:
 
             col_c, col_d, col_e = st.columns(3)
             with col_c:
-                edit_msrp = st.number_input("Default MSRP ($)", value=cur["default_msrp"], min_value=0.0, step=1.0, key="ed_msrp")
+                edit_msrp = st.number_input("Default MSRP ($)", value=cur["default_msrp"], min_value=0.0, max_value=9999.0, step=1.0, key="ed_msrp")
             with col_d:
-                edit_fob = st.number_input("Default FOB ($)", value=cur["default_fob"], min_value=0.0, step=0.5, key="ed_fob")
+                edit_fob = st.number_input("Default FOB ($)", value=cur["default_fob"], min_value=0.0, max_value=9999.0, step=0.5, key="ed_fob")
             with col_e:
                 edit_tariff = st.number_input("Default Tariff Rate (%)", value=cur["default_tariff_rate"] * 100.0, min_value=0.0, max_value=100.0, step=0.5, key="ed_tariff")
 
@@ -319,9 +319,9 @@ else:
 
             col_c, col_d, col_e = st.columns(3)
             with col_c:
-                new_msrp = st.number_input("Default MSRP ($)", min_value=0.0, value=0.0, step=1.0, key="new_msrp")
+                new_msrp = st.number_input("Default MSRP ($)", min_value=0.0, max_value=9999.0, value=0.0, step=1.0, key="new_msrp")
             with col_d:
-                new_fob = st.number_input("Default FOB ($)", min_value=0.0, value=0.0, step=0.5, key="new_fob")
+                new_fob = st.number_input("Default FOB ($)", min_value=0.0, max_value=9999.0, value=0.0, step=0.5, key="new_fob")
             with col_e:
                 new_tariff = st.number_input("Default Tariff Rate (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="new_tariff")
 
