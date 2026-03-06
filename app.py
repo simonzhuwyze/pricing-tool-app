@@ -156,26 +156,35 @@ user_mgmt = st.Page(
 )
 
 # --- Navigation (role-based filtering) ---
-nav_pages = {
-    "Product Directory": [product_directory],
-    "Pricing Tool": [pt_main, pt_channel_mix, pt_cpam, pt_sensitivity, pt_assumptions, pt_export],
-    "Reference": [templates, formula_ref, user_guide],
-}
+try:
+    nav_pages = {
+        "Product Directory": [product_directory],
+        "Pricing Tool": [pt_main, pt_channel_mix, pt_cpam, pt_sensitivity, pt_assumptions, pt_export],
+        "Reference": [templates, formula_ref, user_guide],
+    }
 
-if has_permission("edit_assumptions"):
-    nav_pages["Assumptions"] = [a_retail_margin, a_return_rate, a_outbound, a_product_costs, a_finance]
+    if has_permission("edit_assumptions"):
+        nav_pages["Assumptions"] = [a_retail_margin, a_return_rate, a_outbound, a_product_costs, a_finance]
 
-settings_pages = []
-if has_permission("validate_data"):
-    settings_pages.append(data_validation)
-if has_permission("sync_snowflake"):
-    settings_pages.append(sf_raw_viewer)
-if has_permission("db_admin"):
-    settings_pages.extend([db_admin, user_mgmt])
-if settings_pages:
-    nav_pages["Settings"] = settings_pages
+    settings_pages = []
+    if has_permission("validate_data"):
+        settings_pages.append(data_validation)
+    if has_permission("sync_snowflake"):
+        settings_pages.append(sf_raw_viewer)
+    if has_permission("db_admin"):
+        settings_pages.extend([db_admin, user_mgmt])
+    if settings_pages:
+        nav_pages["Settings"] = settings_pages
 
-pg = st.navigation(nav_pages)
+    pg = st.navigation(nav_pages)
+except Exception as e:
+    # Fallback: ensure navigation still works even if role check fails
+    import logging
+    logging.getLogger(__name__).error(f"Navigation setup error: {e}")
+    pg = st.navigation({
+        "Pricing Tool": [pt_main, pt_channel_mix, pt_cpam, pt_sensitivity, pt_assumptions, pt_export],
+        "Reference": [templates, formula_ref, user_guide],
+    })
 
 # Show user info in sidebar (only when auth is enabled)
 show_user_info()

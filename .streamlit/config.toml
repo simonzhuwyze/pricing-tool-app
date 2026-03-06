@@ -1,3 +1,8 @@
+[client]
+# Disable legacy pages/ directory auto-detection sidebar.
+# We use st.navigation() in app.py for grouped navigation.
+showSidebarNavigation = false
+
 [server]
 headless = true
 port = 8501
