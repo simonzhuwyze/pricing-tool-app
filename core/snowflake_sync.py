@@ -269,12 +269,13 @@ FROM DATA_MART.FINANCE.SHIPPING_COST_EST_SUPPLEMENT
 WHERE BLENDED_COST IS NOT NULL
 """
 
-# Map Snowflake CUSTOMER values to our standard channel names
-# Actual values from SF: "2 E-Commerce - US", "3 E-Commerce - CA", "64 TikTok Shop"
+# Map Snowflake CUSTOMER values to our standard channel names.
+# As of 2026-03: only "3 E-Commerce - CA" exists in SHIPPING_COST_EST_SUPPLEMENT.
+# "2 E-Commerce - US" and "64 TikTok Shop" are kept for future use but have NO data.
 CUSTOMER_CHANNEL_MAP = {
-    "2 E-Commerce - US": "DTC US",
-    "3 E-Commerce - CA": "DTC CA",
-    "64 TikTok Shop": "TikTok Shop",
+    "2 E-Commerce - US": "DTC US",       # NO DATA as of 2026-03
+    "3 E-Commerce - CA": "DTC CA",       # 129 SKUs
+    "64 TikTok Shop": "TikTok Shop",     # NO DATA as of 2026-03
 }
 
 

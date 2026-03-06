@@ -168,8 +168,20 @@ def build_return_rate_comparison(skus: list) -> pd.DataFrame:
 # Helper: Build Outbound Shipping comparison
 # ===========================================================================
 
-# Only these 3 channels have Snowflake shipping data
-SF_SHIPPING_CHANNELS = ["DTC US", "DTC CA", "TikTok Shop"]
+# Channels that have Snowflake shipping data in SHIPPING_COST_EST_SUPPLEMENT.
+# As of 2026-03: only DTC CA has data.  DTC US and TikTok Shop do NOT exist in SF.
+SF_SHIPPING_CHANNELS = ["DTC CA"]
+
+
+def _get_sf_shipping_channels() -> list[str]:
+    """Dynamically detect which channels exist in the SF snapshot table."""
+    try:
+        df = pd.read_sql(
+            "SELECT DISTINCT channel FROM cache_outbound_shipping_sf", engine
+        )
+        return sorted(df["channel"].tolist())
+    except Exception:
+        return SF_SHIPPING_CHANNELS  # fallback to hardcoded
 
 
 def _has_sf_shipping_snapshot() -> bool:
@@ -209,8 +221,9 @@ def build_shipping_comparison(skus: list) -> pd.DataFrame:
             "SELECT sku, channel, outbound_shipping_cost FROM cache_outbound_shipping_sf", engine
         )
         sf_ship.columns = [c.lower() for c in sf_ship.columns]
-        # Only SF channels & drop blank SKUs
-        sf_ship = sf_ship[sf_ship["channel"].isin(SF_SHIPPING_CHANNELS)]
+        # Detect which channels SF actually has
+        actual_sf_channels = sorted(sf_ship["channel"].dropna().unique().tolist())
+        sf_ship = sf_ship[sf_ship["channel"].isin(actual_sf_channels)]
         sf_ship = sf_ship[sf_ship["sku"].str.strip().astype(bool)]
 
         # Build SF dict: (sf_sku, channel) -> cost
@@ -218,12 +231,12 @@ def build_shipping_comparison(skus: list) -> pd.DataFrame:
         for _, r in sf_ship.iterrows():
             sf_dict[(r["sku"], r["channel"])] = float(r["outbound_shipping_cost"] or 0)
 
-        # Load cache (CSV) — only the 3 SF channels
+        # Load cache — only channels that SF actually has data for
         cache_ship = pd.read_sql(
             "SELECT sku, channel, outbound_shipping_cost FROM cache_outbound_shipping", engine
         )
         cache_ship.columns = [c.lower() for c in cache_ship.columns]
-        cache_ship = cache_ship[cache_ship["channel"].isin(SF_SHIPPING_CHANNELS)]
+        cache_ship = cache_ship[cache_ship["channel"].isin(actual_sf_channels)]
 
         if skus:
             cache_ship = cache_ship[cache_ship["sku"].isin(skus)]
@@ -666,15 +679,25 @@ if active_tab == "Return Rate":
 # ===========================================================================
 elif active_tab == "Outbound Shipping":
     st.subheader("Outbound Shipping: Cache vs Snowflake")
-    st.caption(
-        "Compares per-SKU shipping costs: **Cache** (CSV old data / user edits) vs "
-        "**Snowflake** (latest from `SHIPPING_COST_EST_SUPPLEMENT`). "
-        "Only validates **DTC US, DTC CA, TikTok Shop**. "
-        "SF sync does NOT auto-overwrite cache - you decide here."
-    )
 
     # Check if SF snapshot exists
     has_sf_snap = _has_sf_shipping_snapshot()
+
+    # Show which channels SF actually has
+    if has_sf_snap:
+        actual_channels = _get_sf_shipping_channels()
+        st.caption(
+            f"Compares per-SKU shipping costs: **Cache** (CSV / user edits) vs "
+            f"**Snowflake** (`SHIPPING_COST_EST_SUPPLEMENT`). "
+            f"SF data available for: **{', '.join(actual_channels) if actual_channels else 'None'}**. "
+            f"Other channels (DTC US, TikTok Shop, etc.) have no SF shipping data."
+        )
+    else:
+        st.caption(
+            "Compares per-SKU shipping costs: **Cache** (CSV / user edits) vs "
+            "**Snowflake** (`SHIPPING_COST_EST_SUPPLEMENT`). "
+            "SF sync does NOT auto-overwrite cache - you decide here."
+        )
     if not has_sf_snap:
         st.warning(
             "No Snowflake shipping snapshot found. Run **Snowflake Sync** in DB Admin first. "
