@@ -23,7 +23,7 @@ resolved = st.session_state.get("resolved_assumptions")
 
 if not selected_sku or resolved is None:
     st.warning("Please select a product on the Pricing Tool page first.")
-    st.page_link("pages/pricing_tool_main.py", label="Go to Pricing Tool ->")
+    st.page_link("views/pricing_tool_main.py", label="Go to Pricing Tool ->")
     st.stop()
 
 st.caption(f"Product: **{selected_sku}** - {resolved.product_info.product_name}")

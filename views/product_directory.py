@@ -145,7 +145,7 @@ if quick_select:
         "msrp": 0.0, "fob": 0.0, "tariff_rate": 0.0,
         "promotion_mix": 0.0, "promo_percentage": 0.0,
     }
-    st.page_link("pages/pricing_tool_main.py", label=f"Go to Pricing Tool with {sku} ->")
+    st.page_link("views/pricing_tool_main.py", label=f"Go to Pricing Tool with {sku} ->")
 
 # ===========================================================================
 # Edit Existing Product (dialog)

@@ -21,7 +21,7 @@ resolved = st.session_state.get("resolved_assumptions")
 
 if not selected_sku or resolved is None:
     st.warning("Please select a product on the Pricing Tool page first.")
-    st.page_link("pages/pricing_tool_main.py", label="Go to Pricing Tool ->")
+    st.page_link("views/pricing_tool_main.py", label="Go to Pricing Tool ->")
     st.stop()
 
 st.caption(
@@ -206,10 +206,10 @@ st.divider()
 st.subheader("Edit Assumptions")
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.page_link("pages/assumptions_retail_margin.py", label="Edit Retail Margin ->")
-    st.page_link("pages/assumptions_return_rate.py", label="Edit Return Rate ->")
+    st.page_link("views/assumptions_retail_margin.py", label="Edit Retail Margin ->")
+    st.page_link("views/assumptions_return_rate.py", label="Edit Return Rate ->")
 with col2:
-    st.page_link("pages/assumptions_outbound_shipping.py", label="Edit Outbound Shipping ->")
-    st.page_link("pages/assumptions_product_costs.py", label="Edit Product Costs ->")
+    st.page_link("views/assumptions_outbound_shipping.py", label="Edit Outbound Shipping ->")
+    st.page_link("views/assumptions_product_costs.py", label="Edit Product Costs ->")
 with col3:
-    st.page_link("pages/assumptions_finance.py", label="Edit Finance Assumptions ->")
+    st.page_link("views/assumptions_finance.py", label="Edit Finance Assumptions ->")

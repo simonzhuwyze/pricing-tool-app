@@ -371,8 +371,8 @@ else:
 styled_divider(label="Quick Links", icon="link-45deg")
 link_cols = st.columns(3)
 with link_cols[0]:
-    st.page_link("pages/pricing_tool_cpam.py", label="CPAM Breakdown", icon="🧮")
+    st.page_link("views/pricing_tool_cpam.py", label="CPAM Breakdown", icon="🧮")
 with link_cols[1]:
-    st.page_link("pages/pricing_tool_channel_mix.py", label="Channel Mix", icon="📊")
+    st.page_link("views/pricing_tool_channel_mix.py", label="Channel Mix", icon="📊")
 with link_cols[2]:
-    st.page_link("pages/pricing_tool_assumptions.py", label="Assumptions", icon="📋")
+    st.page_link("views/pricing_tool_assumptions.py", label="Assumptions", icon="📋")

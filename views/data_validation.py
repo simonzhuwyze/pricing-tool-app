@@ -27,7 +27,7 @@ try:
     engine = get_sqlalchemy_engine()
 except Exception as e:
     st.error(f"Database connection required. Error: {e}")
-    st.page_link("pages/db_admin.py", label="Go to DB Admin ->")
+    st.page_link("views/db_admin.py", label="Go to DB Admin ->")
     st.stop()
 
 # Import canonical sub-channel mapping from data_loader

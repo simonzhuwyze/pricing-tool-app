@@ -26,6 +26,10 @@ Streamlit web app (Python 3.12) for FP&A product pricing. Replaces SharePoint Li
 8. **Streamlit icons**: Use Unicode emoji chars, NOT `:shortcode:` format
 9. **Reference SKU NaN**: Always check `pd.notna()` before converting to string
 
+## Workflow
+- **Auto deploy**: After code changes, always `git add` + `git commit` + `git push` without asking. CI/CD (GitHub Actions) auto-deploys to Azure on push to main.
+- **Do NOT use `showSidebarNavigation = false`** in config.toml — it hides `st.navigation()` sidebar too. `st.navigation()` already overrides legacy pages/ auto-detection.
+
 ## 13 Standard Channels
 DTC US, DTC CA, TikTok Shop, Amazon 1P, Home Depot US, Home Depot CA, Best Buy, Costco, Costco.com, Amazon 3P, ACE, Walmart 1P, New Channel 2
 

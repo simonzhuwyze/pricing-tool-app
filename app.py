@@ -51,106 +51,106 @@ if "current_user" not in st.session_state:
 # --- Page definitions ---
 # Product Directory
 product_directory = st.Page(
-    "pages/product_directory.py",
+    "views/product_directory.py",
     title="Product Directory",
     icon="📦",
 )
 
 # Pricing Tool
 pt_main = st.Page(
-    "pages/pricing_tool_main.py",
+    "views/pricing_tool_main.py",
     title="Pricing Tool",
     icon="💰",
     default=True,
 )
 pt_cpam = st.Page(
-    "pages/pricing_tool_cpam.py",
+    "views/pricing_tool_cpam.py",
     title="CPAM Calculator",
     icon="🧮",
 )
 pt_channel_mix = st.Page(
-    "pages/pricing_tool_channel_mix.py",
+    "views/pricing_tool_channel_mix.py",
     title="Channel Mix",
     icon="📊",
 )
 pt_sensitivity = st.Page(
-    "pages/pricing_tool_sensitivity.py",
+    "views/pricing_tool_sensitivity.py",
     title="Sensitivity Analysis",
     icon="📈",
 )
 pt_assumptions = st.Page(
-    "pages/pricing_tool_assumptions.py",
+    "views/pricing_tool_assumptions.py",
     title="Assumptions Loaded",
     icon="📋",
 )
 pt_export = st.Page(
-    "pages/pricing_tool_export.py",
+    "views/pricing_tool_export.py",
     title="Export & Save",
     icon="📄",
 )
 
 # Reference
 templates = st.Page(
-    "pages/pricing_templates.py",
+    "views/pricing_templates.py",
     title="Pricing Templates",
     icon="📁",
 )
 formula_ref = st.Page(
-    "pages/formula_reference.py",
+    "views/formula_reference.py",
     title="Formula Reference",
     icon="📐",
 )
 user_guide = st.Page(
-    "pages/user_guide.py",
+    "views/user_guide.py",
     title="User Guide",
     icon="📖",
 )
 
 # Assumptions
 a_retail_margin = st.Page(
-    "pages/assumptions_retail_margin.py",
+    "views/assumptions_retail_margin.py",
     title="Retail Margin",
     icon="🧾",
 )
 a_return_rate = st.Page(
-    "pages/assumptions_return_rate.py",
+    "views/assumptions_return_rate.py",
     title="Return Rate",
     icon="↩",
 )
 a_outbound = st.Page(
-    "pages/assumptions_outbound_shipping.py",
+    "views/assumptions_outbound_shipping.py",
     title="Outbound Shipping",
     icon="🚚",
 )
 a_product_costs = st.Page(
-    "pages/assumptions_product_costs.py",
+    "views/assumptions_product_costs.py",
     title="Product Costs",
     icon="🏭",
 )
 a_finance = st.Page(
-    "pages/assumptions_finance.py",
+    "views/assumptions_finance.py",
     title="Finance Assumptions",
     icon="🏦",
 )
 
 # Settings
 db_admin = st.Page(
-    "pages/db_admin.py",
+    "views/db_admin.py",
     title="DB Admin",
     icon="⚙",
 )
 data_validation = st.Page(
-    "pages/data_validation.py",
+    "views/data_validation.py",
     title="Data Validation",
     icon="✅",
 )
 sf_raw_viewer = st.Page(
-    "pages/sf_raw_viewer.py",
+    "views/sf_raw_viewer.py",
     title="SF Raw Data",
     icon="❄",
 )
 user_mgmt = st.Page(
-    "pages/user_management.py",
+    "views/user_management.py",
     title="User Management",
     icon="👥",
 )
