@@ -38,15 +38,6 @@ class TemplateSummary:
     is_active: bool
 
 
-def _get_engine():
-    """Get SQLAlchemy engine. Returns None if unavailable."""
-    try:
-        from core.database import get_sqlalchemy_engine
-        return get_sqlalchemy_engine()
-    except Exception:
-        return None
-
-
 def _get_conn():
     """Get pyodbc connection."""
     from core.database import get_connection
@@ -64,58 +55,65 @@ def list_templates(
     """
     List templates. Returns DataFrame with summary columns.
     Filters by SKU and/or user if provided.
+    Uses pyodbc directly for consistency with save_template.
     """
-    engine = _get_engine()
-    if engine is None:
-        return pd.DataFrame()
-
     query = "SELECT * FROM pricing_templates WHERE 1=1"
-    params = {}
+    params = []
     if sku:
-        query += " AND sku = :sku"
-        params["sku"] = sku
+        query += " AND sku = ?"
+        params.append(sku)
     if user:
-        query += " AND created_by = :user"
-        params["user"] = user
+        query += " AND created_by = ?"
+        params.append(user)
     if active_only:
         query += " AND (is_active = 1 OR is_active IS NULL)"
     query += " ORDER BY updated_at DESC"
 
     try:
-        return pd.read_sql(query, engine, params=params)
+        conn = _get_conn()
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+        conn.close()
+        return pd.DataFrame.from_records([tuple(r) for r in rows], columns=columns)
     except Exception as e:
         logger.warning(f"Failed to list templates: {e}")
-        return pd.DataFrame()
+        raise  # Let caller handle and show error to user
 
 
 def get_template_by_id(template_id: int) -> Optional[dict]:
     """Load a full template (inputs + channel mix + assumption snapshot)."""
-    engine = _get_engine()
-    if engine is None:
-        return None
-
     try:
+        conn = _get_conn()
+        cursor = conn.cursor()
+
         # Master record
-        master = pd.read_sql(
-            f"SELECT * FROM pricing_templates WHERE id = {template_id}", engine
-        )
-        if master.empty:
+        cursor.execute("SELECT * FROM pricing_templates WHERE id = ?", (template_id,))
+        cols = [desc[0] for desc in cursor.description]
+        row = cursor.fetchone()
+        if row is None:
+            conn.close()
             return None
-        master_row = master.iloc[0].to_dict()
+        master_row = dict(zip(cols, row))
 
         # Channel mix
-        mix_df = pd.read_sql(
-            f"SELECT channel, mix_pct FROM pricing_template_channel_mix WHERE template_id = {template_id}",
-            engine,
+        cursor.execute(
+            "SELECT channel, mix_pct FROM pricing_template_channel_mix WHERE template_id = ?",
+            (template_id,),
         )
-        channel_mix = dict(zip(mix_df["channel"], mix_df["mix_pct"]))
+        channel_mix = {r[0]: r[1] for r in cursor.fetchall()}
 
         # Assumption snapshot
-        assumptions_df = pd.read_sql(
-            f"SELECT channel, field_name, field_value FROM pricing_template_assumptions WHERE template_id = {template_id}",
-            engine,
+        cursor.execute(
+            "SELECT channel, field_name, field_value FROM pricing_template_assumptions WHERE template_id = ?",
+            (template_id,),
         )
+        a_cols = [desc[0] for desc in cursor.description]
+        a_rows = cursor.fetchall()
+        assumptions_df = pd.DataFrame.from_records([tuple(r) for r in a_rows], columns=a_cols) if a_rows else pd.DataFrame()
 
+        conn.close()
         return {
             "master": master_row,
             "channel_mix": channel_mix,

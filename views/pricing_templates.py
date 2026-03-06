@@ -66,10 +66,14 @@ if active_tab == "Browse Templates":
     with col_f2:
         filter_user = st.text_input("Filter by User", key="browse_user_filter")
 
-    templates_df = list_templates(
-        sku=filter_sku or None,
-        user=filter_user or None,
-    )
+    try:
+        templates_df = list_templates(
+            sku=filter_sku or None,
+            user=filter_user or None,
+        )
+    except Exception as e:
+        st.error(f"Failed to load templates: {e}")
+        templates_df = pd.DataFrame()
 
     if templates_df.empty:
         st.info("No templates found. Save your first template from the **Export & Save** page.")
@@ -151,7 +155,11 @@ elif active_tab == "Load Template":
 
     if current_sku:
         st.write(f"**Templates for current SKU ({current_sku}):**")
-        sku_templates = list_templates(sku=current_sku)
+        try:
+            sku_templates = list_templates(sku=current_sku)
+        except Exception as e:
+            st.error(f"Failed to load templates: {e}")
+            sku_templates = pd.DataFrame()
         if sku_templates.empty:
             st.info(f"No templates for {current_sku}.")
         else:
