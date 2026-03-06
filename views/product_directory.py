@@ -189,7 +189,7 @@ else:
             with col_d:
                 edit_fob = st.number_input("Default FOB ($)", value=cur["default_fob"], min_value=0.0, step=0.5, key="ed_fob")
             with col_e:
-                edit_tariff = st.number_input("Default Tariff Rate (%)", value=cur["default_tariff_rate"], min_value=0.0, max_value=100.0, step=0.5, key="ed_tariff")
+                edit_tariff = st.number_input("Default Tariff Rate (%)", value=cur["default_tariff_rate"] * 100.0, min_value=0.0, max_value=100.0, step=0.5, key="ed_tariff")
 
             new_ref_val = edit_ref if edit_ref != "(none)" else None
             old_ref_val = cur["reference_sku"] if cur["reference_sku"] and pd.notna(cur["reference_sku"]) else None
@@ -226,7 +226,7 @@ else:
                             reference_sku=new_ref_val,
                             default_msrp=edit_msrp,
                             default_fob=edit_fob,
-                            default_tariff_rate=edit_tariff,
+                            default_tariff_rate=edit_tariff / 100.0,  # UI shows %, DB stores decimal
                             user=st.session_state.get("current_user", "local_user"),
                         )
 
@@ -345,7 +345,7 @@ else:
                         product_name=new_name.strip(),
                         default_msrp=new_msrp,
                         default_fob=new_fob,
-                        default_tariff_rate=new_tariff,
+                        default_tariff_rate=new_tariff / 100.0,  # UI shows %, DB stores decimal
                         user=st.session_state.get("current_user", "local_user"),
                     )
                     try:

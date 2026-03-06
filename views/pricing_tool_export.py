@@ -509,8 +509,18 @@ if st.button("Save Template", type="primary", key="export_save_template"):
                 resolved_assumptions=resolved,
                 notes=notes,
             )
-            st.success(f"Template saved! (ID: {tid})")
+            st.session_state["_template_save_msg"] = f"Template saved successfully! (ID: {tid}) - View it on the **Pricing Templates** page."
         except Exception as e:
-            st.error(f"Save failed: {e}")
+            st.session_state["_template_save_msg"] = f"ERROR: Save failed: {e}"
     else:
-        st.warning("Please enter a template name.")
+        st.session_state["_template_save_msg"] = "WARNING: Please enter a template name."
+
+# Show persistent save feedback
+if "_template_save_msg" in st.session_state:
+    msg = st.session_state.pop("_template_save_msg")
+    if msg.startswith("ERROR:"):
+        st.error(msg.replace("ERROR: ", ""))
+    elif msg.startswith("WARNING:"):
+        st.warning(msg.replace("WARNING: ", ""))
+    else:
+        st.success(msg)

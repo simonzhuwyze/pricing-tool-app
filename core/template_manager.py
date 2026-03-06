@@ -78,7 +78,7 @@ def list_templates(
         query += " AND created_by = :user"
         params["user"] = user
     if active_only:
-        query += " AND is_active = 1"
+        query += " AND (is_active = 1 OR is_active IS NULL)"
     query += " ORDER BY updated_at DESC"
 
     try:
@@ -163,11 +163,11 @@ def save_template(
 
     if existing:
         template_id = existing[0]
-        # Update master record
+        # Update master record (also ensure is_active = 1 in case it was soft-deleted)
         cursor.execute("""
             UPDATE pricing_templates
             SET msrp = ?, fob = ?, tariff_rate = ?, promotion_mix = ?,
-                promo_percentage = ?, notes = ?, updated_at = GETUTCDATE()
+                promo_percentage = ?, notes = ?, is_active = 1, updated_at = GETUTCDATE()
             WHERE id = ?
         """, (msrp, fob, tariff_rate, promotion_mix, promo_percentage, notes, template_id))
 
@@ -179,9 +179,9 @@ def save_template(
         cursor.execute("""
             INSERT INTO pricing_templates
             (template_key, sku, template_name, created_by, msrp, fob, tariff_rate,
-             promotion_mix, promo_percentage, notes)
+             promotion_mix, promo_percentage, notes, is_active)
             OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         """, (template_key, sku, template_name, user, msrp, fob, tariff_rate,
               promotion_mix, promo_percentage, notes))
         template_id = int(cursor.fetchone()[0])
